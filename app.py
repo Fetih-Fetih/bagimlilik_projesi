@@ -4,7 +4,6 @@ from groq import Groq
 import base64
 
 # --- 1. SAYFA VE TASARIM AYARLARI ---
-# initial_sidebar_state="collapsed" ile menüyü BAŞLANGIÇTA KAPALI tutuyoruz.
 st.set_page_config(
     page_title="Alışkanlık Asistanı", 
     page_icon="🌱", 
@@ -12,24 +11,30 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# CSS ile Sol Üstteki Menü Açma Düğmesini (Üç Çizgi) Çok Daha Belirgin Yapıyoruz
+# CSS ile Sol Üstteki Üç Çizgi / Menü İkonunu BEYAZ Yapma ve Belirginleştirme
 st.markdown("""
     <style>
     footer {visibility: hidden;}
-    header {visibility: hidden;}
     .stButton>button { width: 100%; }
     
-    /* Sol üstteki menü açma butonunu (üç çizgi/ok) belirginleştirme */
+    /* Sol üstteki menü butonunu belirgin ve BEYAZ ikonlu yapma */
     [data-testid="stSidebarCollapseButton"] {
         background-color: #2e7d32 !important;
-        color: white !important;
+        color: #ffffff !important;
         border-radius: 8px !important;
-        padding: 5px !important;
-        margin-top: 10px !important;
-        margin-left: 10px !important;
+        padding: 6px 12px !important;
+        margin-top: 5px !important;
     }
     
-    /* Açılan menü üst başlığı */
+    [data-testid="stSidebarCollapseButton"] svg {
+        fill: #ffffff !important;
+        color: #ffffff !important;
+        stroke: #ffffff !important;
+        width: 24px !important;
+        height: 24px !important;
+    }
+
+    /* Açılan menünün üst başlığı */
     .sidebar-header {
         background-color: #2e7d32;
         color: white;
@@ -131,7 +136,7 @@ if not st.session_state.user:
                             except Exception as err:
                                 st.error("Giriş Başarısız: E-posta veya şifre hatalı.")
 
-                # KAYIT OL (DOĞUM TARİHİ VE CİNSİYET İLE)
+                # KAYIT OL
                 with tab_register:
                     reg_name = st.text_input("Ad Soyad", key="r_name")
                     reg_email = st.text_input("E-Posta Adresi", key="r_email")
@@ -185,8 +190,8 @@ else:
     user_email = st.session_state.user.email
     display_name = st.session_state.profile_name if st.session_state.profile_name else user_email.split('@')[0]
     
-    # SOL AÇILIR MENÜ (AÇILINCA GÖRÜNEN İÇERİK)
-    st.sidebar.markdown('<div class="sidebar-header">☰ MENÜ & KONTROL PANELİ</div>', unsafe_allow_html=True)
+    # SOL AÇILIR MENÜ İÇERİĞİ
+    st.sidebar.markdown('<div class="sidebar-header">☰ MENÜ</div>', unsafe_allow_html=True)
     
     if st.sidebar.button("⚙️ Profilimi Düzenle"):
         st.session_state.sayfa = "👤 Profilim"
