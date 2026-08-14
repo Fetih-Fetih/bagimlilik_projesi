@@ -11,30 +11,25 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# CSS ile Sol Üstteki Üç Çizgi / Menü İkonunu BEYAZ Yapma ve Belirginleştirme
+# CSS ile Sol Üstteki Özel Yeşil Kutulu "☰ Menü" Butonunun Tasarımı
 st.markdown("""
     <style>
     footer {visibility: hidden;}
+    header {visibility: hidden;}
     .stButton>button { width: 100%; }
     
-    /* Sol üstteki menü butonunu belirgin ve BEYAZ ikonlu yapma */
-    [data-testid="stSidebarCollapseButton"] {
+    /* Sol üstteki sabit Yeşil Menü Kutusu */
+    div[data-testid="stColumn"] button[key="btn_toggle_sidebar"] {
         background-color: #2e7d32 !important;
         color: #ffffff !important;
+        font-weight: bold !important;
+        border: none !important;
         border-radius: 8px !important;
-        padding: 6px 12px !important;
-        margin-top: 5px !important;
+        padding: 8px 16px !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
     }
     
-    [data-testid="stSidebarCollapseButton"] svg {
-        fill: #ffffff !important;
-        color: #ffffff !important;
-        stroke: #ffffff !important;
-        width: 24px !important;
-        height: 24px !important;
-    }
-
-    /* Açılan menünün üst başlığı */
+    /* Yan Menü Üst Başlığı */
     .sidebar-header {
         background-color: #2e7d32;
         color: white;
@@ -72,6 +67,8 @@ if "gun_sayisi" not in st.session_state:
     st.session_state.gun_sayisi = 1
 if "sayfa" not in st.session_state:
     st.session_state.sayfa = "🌱 AI Koç & Sohbet"
+if "sidebar_open" not in st.session_state:
+    st.session_state.sidebar_open = False
 
 # Profil Bilgileri
 if "profile_name" not in st.session_state:
@@ -190,30 +187,46 @@ else:
     user_email = st.session_state.user.email
     display_name = st.session_state.profile_name if st.session_state.profile_name else user_email.split('@')[0]
     
-    # SOL AÇILIR MENÜ İÇERİĞİ
-    st.sidebar.markdown('<div class="sidebar-header">☰ MENÜ</div>', unsafe_allow_html=True)
-    
-    if st.sidebar.button("⚙️ Profilimi Düzenle"):
-        st.session_state.sayfa = "👤 Profilim"
-        st.rerun()
+    # SOL ÜSTTEKİ YEŞİL "☰ MENÜ" KUTUSU
+    col_menu_btn, _ = st.columns([1, 6])
+    with col_menu_btn:
+        if st.button("☰ Menü", key="btn_toggle_sidebar"):
+            st.session_state.sidebar_open = not st.session_state.sidebar_open
 
-    st.sidebar.divider()
-    
-    secilen_sayfa = st.sidebar.radio(
-        "📌 Sayfalar",
-        ["🌱 AI Koç & Sohbet", "📊 İlerlemelerim", "📜 AI Geçmişim", "👤 Profilim"],
-        index=["🌱 AI Koç & Sohbet", "📊 İlerlemelerim", "📜 AI Geçmişim", "👤 Profilim"].index(st.session_state.sayfa)
-    )
-    st.session_state.sayfa = secilen_sayfa
-    
-    st.sidebar.divider()
-    
-    if st.sidebar.button("🚪 Çıkış Yap"):
-        if supabase:
-            supabase.auth.sign_out()
-        st.session_state.user = None
-        st.session_state.messages = []
-        st.rerun()
+    # Menü Açıksa Yan Paneli Göster
+    if st.session_state.sidebar_open:
+        with st.sidebar:
+            st.markdown('<div class="sidebar-header">☰ KONTROL PANELİ</div>', unsafe_allow_html=True)
+            
+            if st.button("✖ Menüyü Kapat"):
+                st.session_state.sidebar_open = False
+                st.rerun()
+
+            st.divider()
+
+            if st.button("⚙️ Profilimi Düzenle"):
+                st.session_state.sayfa = "👤 Profilim"
+                st.session_state.sidebar_open = False
+                st.rerun()
+
+            st.divider()
+            
+            secilen_sayfa = st.radio(
+                "📌 Sayfalar",
+                ["🌱 AI Koç & Sohbet", "📊 İlerlemelerim", "📜 AI Geçmişim", "👤 Profilim"],
+                index=["🌱 AI Koç & Sohbet", "📊 İlerlemelerim", "📜 AI Geçmişim", "👤 Profilim"].index(st.session_state.sayfa)
+            )
+            st.session_state.sayfa = secilen_sayfa
+            
+            st.divider()
+            
+            if st.button("🚪 Çıkış Yap"):
+                if supabase:
+                    supabase.auth.sign_out()
+                st.session_state.user = None
+                st.session_state.messages = []
+                st.session_state.sidebar_open = False
+                st.rerun()
 
     # --- SAYFA: PROFİLİM ---
     if st.session_state.sayfa == "👤 Profilim":
