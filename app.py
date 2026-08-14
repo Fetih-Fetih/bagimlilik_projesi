@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit_authenticator as stauth
 from groq import Groq
 
 # Sayfa Tasarımı
@@ -15,46 +14,30 @@ hide_streamlit_style = """
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# ÖRNEK KULLANICI VERİLERİ (İleride bunu bir veri tabanına bağlayabiliriz)
-# Parolalar güvenlik için hash'lenmiş (şifrelenmiş) olarak tutulmalıdır.
-credentials = {
-    "usernames": {
-        "ahmet": {
-            "name": "Ahmet Yılmaz",
-            "password": "abc"  # Test için basit bir şifre
-        },
-        "mehmet": {
-            "name": "Mehmet Kaya",
-            "password": "123"
-        }
-    }
-}
+# --- BASİT GİRİŞ SİSTEMİ (Session State ile) ---
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 
-# Giriş Yöneticisi Oluşturma
-authenticator = stauth.Authenticate(
-    credentials,
-    "app_cookie",
-    "auth_key",
-    cookie_expiry_days=30
-)
-
-# Giriş Formunu Ekrana Basma
-name, authentication_status, username = authenticator.login("main")
-
-# --- GİRİŞ KONTROLÜ ---
-
-if authentication_status == False:
-    st.error("Kullanıcı adı veya şifre hatalı.")
-
-elif authentication_status == None:
-    st.warning("Lütfen devam etmek için kullanıcı adı ve şifrenizle giriş yapın.")
-
-elif authentication_status:
-    # GİRİŞ BAŞARILI İSE BURASI ÇALIŞIR
+if not st.session_state.logged_in:
+    st.title("🔑 Giriş Yap")
+    username = st.text_input("Kullanıcı Adı")
+    password = st.text_input("Şifre", type="password")
     
-    # Sağ üst köşeye çıkış butonu ekleme
-    authenticator.logout("Çıkış Yap", "sidebar")
-    st.sidebar.write(f"Hoş geldin, **{name}**! 👋")
+    if st.button("Giriş Yap"):
+        # Şimdilik sabit bir kullanıcı adı ve şifre belirleyelim:
+        if username == "admin" and password == "1234":
+            st.session_state.logged_in = True
+            st.success("Giriş başarılı!")
+            st.rerun()
+        else:
+            st.error("Kullanıcı adı veya şifre hatalı!")
+else:
+    # --- GİRİŞ BAŞARILI İSE AÇILACAK ANA EKRAN ---
+    
+    # Çıkış Butonu
+    if st.sidebar.button("Çıkış Yap"):
+        st.session_state.logged_in = False
+        st.rerun()
 
     st.title("🌱 Alışkanlık & Motivasyon Asistanı")
     st.write("Hoş geldin! Bugün kendini nasıl hissediyorsun? Sana nasıl destek olabilirim?")
@@ -67,7 +50,7 @@ elif authentication_status:
     # Groq API Anahtarın
     GROQ_API_KEY = "gsk_..."  # Kendi Groq API anahtarını buraya yaz
 
-    if GROQ_API_KEY and GROQ_API_KEY != "BURAYA_GROQ_API_KEYINIZI_YAZIN":
+    if GROQ_API_KEY and GROQ_API_KEY.startswith("gsk_"):
         client = Groq(api_key=GROQ_API_KEY)
 
         # Sohbet Geçmişini Saklama
