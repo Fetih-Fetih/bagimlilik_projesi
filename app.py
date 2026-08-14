@@ -76,8 +76,9 @@ if not st.session_state.user:
                             st.warning("Lütfen tüm alanları doldurun.")
                         else:
                             try:
+                                clean_email = email.strip().lower()
                                 res = supabase.auth.sign_in_with_password({
-                                    "email": email.strip(),
+                                    "email": clean_email,
                                     "password": password
                                 })
                                 st.session_state.user = res.user
@@ -102,11 +103,12 @@ if not st.session_state.user:
                             st.warning("Şifre en az 6 karakter olmalıdır.")
                         else:
                             try:
+                                clean_reg_email = reg_email.strip().lower()
                                 res = supabase.auth.sign_up({
-                                    "email": reg_email.strip(),
+                                    "email": clean_reg_email,
                                     "password": reg_pass
                                 })
-                                st.success("Kayıt başarılı! Hesabınız oluşturuldu. Şimdi 'Giriş Yap' sekmesinden giriş yapabilirsiniz.")
+                                st.success("Kayıt başarılı! Şimdi 'Giriş Yap' sekmesinden giriş yapabilirsiniz.")
                             except Exception as err:
                                 st.error(f"Kayıt Hatası: {err}")
 
@@ -146,7 +148,9 @@ else:
         st.session_state.messages = []
         st.rerun()
 
-    st.sidebar.hr()
+    # DÜZELTİLEN SATIR: st.sidebar.hr() yerine st.sidebar.divider() kullanıldı.
+    st.sidebar.divider()
+
     st.sidebar.header("İlerleme Durumun")
     gun_sayisi = st.sidebar.number_input("Kaçıncı gündesin?", min_value=1, value=1)
     st.sidebar.success(f"Tebrikler! {gun_sayisi}. günündesin! 🎉")
@@ -172,18 +176,21 @@ else:
 
             # AI Yanıtı Üret
             with st.chat_message("assistant"):
-                system_prompt = f"Sen empatik, destekleyici ve motivasyon veren bir yaşam koçusun. Kullanıcının e-postası {user_email} ve kötü alışkanlıkla mücadelesinde {gun_sayisi}. gününde."
-                
-                chat_completion = client.chat.completions.create(
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": prompt}
-                    ],
-                    model="llama-3.3-70b-versatile",
-                )
-                
-                ai_reply = chat_completion.choices[0].message.content
-                st.markdown(ai_reply)
-                st.session_state.messages.append({"role": "assistant", "content": ai_reply})
+                try:
+                    system_prompt = f"Sen empatik, destekleyici ve motivasyon veren bir yaşam koçusun. Kullanıcının e-postası {user_email} ve kötü alışkanlıkla mücadelesinde {gun_sayisi}. gününde."
+                    
+                    chat_completion = client.chat.completions.create(
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": prompt}
+                        ],
+                        model="llama-3.3-70b-versatile",
+                    )
+                    
+                    ai_reply = chat_completion.choices[0].message.content
+                    st.markdown(ai_reply)
+                    st.session_state.messages.append({"role": "assistant", "content": ai_reply})
+                except Exception as e:
+                    st.error(f"Yapay zeka yanıt oluştururken bir sorun yaşandı: {e}")
     else:
         st.warning("Lütfen Streamlit Secrets kısmına GROQ_API_KEY ekleyin.")
