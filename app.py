@@ -5,7 +5,6 @@ from groq import Groq
 # --- 1. SAYFA VE TASARIM AYARLARI ---
 st.set_page_config(page_title="Alışkanlık Asistanı", page_icon="🌱", layout="wide")
 
-# CSS ile Menüleri Gizleme ve Temiz Tasarım
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
@@ -15,20 +14,21 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. SUPABASE BULUT BAĞLANTISI ---
+# --- 2. SUPABASE BAĞLANTISI ---
 @st.cache_resource
 def init_supabase() -> Client:
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
-    return create_client(url, key)
+    # URL'nin sonundaki ve başındaki olası fazla karakterleri kesin olarak temizliyoruz
+    raw_url = st.secrets["SUPABASE_URL"].strip().rstrip("/")
+    key = st.secrets["SUPABASE_KEY"].strip()
+    return create_client(raw_url, key)
 
 try:
     supabase = init_supabase()
 except Exception as e:
-    st.error("Veri tabanı bağlantısı kurulamadı. Lütfen Streamlit Secrets ayarlarınızı kontrol edin.")
+    st.error("Veri tabanı bağlantısı kurululamadı. Lütfen Streamlit Secrets ayarlarınızı kontrol edin.")
     st.stop()
 
-# --- 3. OTURUM DURUMLARI (SESSION STATE) ---
+# --- 3. OTURUM DURUMLARI ---
 if "user" not in st.session_state:
     st.session_state.user = None
 if "messages" not in st.session_state:
@@ -39,7 +39,7 @@ if "show_auth_modal" not in st.session_state:
 # --- 4. GİRİŞ YAPILMAMIŞSA (LANDING PAGE & AUTH) ---
 if not st.session_state.user:
     
-    # Üst Menü / Header
+    # Üst Bar
     col_logo, col_space, col_login, col_register = st.columns([3, 4, 1.5, 1.5])
     
     with col_logo:
@@ -55,54 +55,66 @@ if not st.session_state.user:
 
     st.divider()
 
-    # Giriş / Kayıt Ol Form Penceresi (Modal)
+    # Giriş / Kayıt Ol Modalı
     if st.session_state.show_auth_modal:
         _, auth_col, _ = st.columns([1, 2, 1])
         with auth_col:
             st.info("Devam etmek için hesabınıza giriş yapın veya kayıt olun.")
             tab_login, tab_register = st.tabs(["🔑 Giriş Yap", "📝 Kayıt Ol"])
             
-            # --- GİRİŞ YAP SEKMESİ ---
+            # GİRİŞ YAP SEKMESİ
             with tab_login:
                 email = st.text_input("E-Posta Adresi", key="l_email")
                 password = st.text_input("Şifre", type="password", key="l_pass")
                 
                 if st.button("Giriş Yap", type="primary", key="btn_l"):
-                    try:
-                        res = supabase.auth.sign_in_with_password({"email": email, "password": password})
-                        st.session_state.user = res.user
-                        st.session_state.show_auth_modal = False
-                        st.success("Giriş başarılı!")
-                        st.rerun()
-                    except Exception as err:
-                        st.error(f"Giriş Başarısız: E-posta veya şifre hatalı.")
+                    if not email or not password:
+                        st.warning("Lütfen e-posta ve şifrenizi girin.")
+                    else:
+                        try:
+                            res = supabase.auth.sign_in_with_password({
+                                "email": email.strip(),
+                                "password": password
+                            })
+                            st.session_state.user = res.user
+                            st.session_state.show_auth_modal = False
+                            st.success("Giriş başarılı!")
+                            st.rerun()
+                        except Exception as err:
+                            st.error("Giriş Başarısız: E-posta veya şifre hatalı.")
                 
                 st.write("--- veya ---")
                 
                 if st.button("🌐 Google Hesabı ile Devam Et"):
                     try:
-                        res = supabase.auth.sign_in_with_oauth({
-                            "provider": "google"
-                        })
+                        res = supabase.auth.sign_in_with_oauth({"provider": "google"})
                         st.markdown(f"[Google ile Giriş Yapmak İçin Tıklayın]({res.url})")
                     except Exception as err:
                         st.error(f"Google ile giriş başlatılamadı: {err}")
 
-            # --- KAYIT OL SEKMESİ ---
+            # KAYIT OL SEKMESİ
             with tab_register:
                 reg_email = st.text_input("E-Posta Adresi", key="r_email")
                 reg_pass = st.text_input("Şifre (En az 6 karakter)", type="password", key="r_pass")
                 reg_pass_conf = st.text_input("Şifre Tekrar", type="password", key="r_conf")
                 
                 if st.button("Kayıt Ol", key="btn_r"):
-                    if reg_pass != reg_pass_conf:
+                    if not reg_email or not reg_pass:
+                        st.warning("Lütfen tüm alanları doldurun.")
+                    elif reg_pass != reg_pass_conf:
                         st.error("Şifreler eşleşmiyor!")
                     elif len(reg_pass) < 6:
                         st.warning("Şifre en az 6 karakter olmalıdır.")
                     else:
                         try:
-                            res = supabase.auth.sign_up({"email": reg_email, "password": reg_pass})
-                            st.success("Kayıt başarılı! E-posta adresinize gelen doğrulama bağlantısını onaylayarak giriş yapabilirsiniz.")
+                            res = supabase.auth.sign_up({
+                                "email": reg_email.strip(),
+                                "password": reg_pass
+                            })
+                            if res.user:
+                                st.success("Kayıt başarılı! E-posta adresinize gelen onay bağlantısına tıklayarak giriş yapabilirsiniz.")
+                            else:
+                                st.info("Kayıt isteği gönderildi. E-postanızı kontrol edin.")
                         except Exception as err:
                             st.error(f"Kayıt Hatası: {err}")
 
@@ -111,7 +123,7 @@ if not st.session_state.user:
                 st.rerun()
         st.divider()
 
-    # Tanıtım Sayfası İçeriği (Landing Page)
+    # Tanıtım İçeriği
     st.markdown("<h1 style='text-align: center;'>Kötü Alışkanlıklarından Kurtul, Hayatını Yeniden İnşa Et 🚀</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; font-size: 18px;'>Yapay zeka destekli kişisel koçun ile her gün geliş, hedeflerine ulaş ve motivasyonunu en üst seviyede tut.</p>", unsafe_allow_html=True)
     
@@ -132,7 +144,7 @@ if not st.session_state.user:
 else:
     user_email = st.session_state.user.email
     
-    # Sol Menü (Sidebar)
+    # Sol Menü
     st.sidebar.write(f"👤 **{user_email}**")
     
     if st.sidebar.button("🚪 Çıkış Yap"):
@@ -147,7 +159,7 @@ else:
     gun_sayisi = st.sidebar.number_input("Kaçıncı gündesin?", min_value=1, value=1)
     st.sidebar.success(f"Tebrikler! {gun_sayisi}. günündesin! 🎉")
 
-    # Yapay Zeka Chat Alanı
+    # Chat Alanı
     st.title("🌱 Alışkanlık & Motivasyon Asistanı")
     st.write("Hoş geldin! Bugün nasıl hissediyorsun?")
 
