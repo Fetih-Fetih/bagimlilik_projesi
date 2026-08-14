@@ -1,17 +1,32 @@
 import streamlit as st
 from supabase import create_client, Client
 from groq import Groq
+import base64
 
 # --- 1. SAYFA VE TASARIM AYARLARI ---
 st.set_page_config(page_title="Alışkanlık Asistanı", page_icon="🌱", layout="wide")
 
-# Streamlit Menülerini Gizleme ve Temiz Tasarım (CSS)
+# CSS ile Profil Kartı ve Temiz Arayüz Tasarımı
 st.markdown("""
     <style>
-    #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     .stButton>button { width: 100%; }
+    .profile-card {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    .profile-img {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 3px solid #4CAF50;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -36,11 +51,24 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "show_auth_modal" not in st.session_state:
     st.session_state.show_auth_modal = False
+if "gun_sayisi" not in st.session_state:
+    st.session_state.gun_sayisi = 1
+if "sayfa" not in st.session_state:
+    st.session_state.sayfa = "🌱 AI Koç & Sohbet"
+
+# Profil Bilgileri
+if "profile_name" not in st.session_state:
+    st.session_state.profile_name = ""
+if "profile_pic" not in st.session_state:
+    st.session_state.profile_pic = None
+if "birth_date" not in st.session_state:
+    st.session_state.birth_date = "2000-01-01"
+if "gender" not in st.session_state:
+    st.session_state.gender = "Belirtilmedi"
 
 # --- 4. GİRİŞ YAPILMAMIŞSA (LANDING PAGE & AUTH) ---
 if not st.session_state.user:
     
-    # Üst Bar (Header)
     col_logo, col_space, col_login, col_register = st.columns([3, 4, 1.5, 1.5])
     
     with col_logo:
@@ -56,17 +84,16 @@ if not st.session_state.user:
 
     st.divider()
 
-    # Giriş / Kayıt Ol Formu (Modal/Açılır Pencere)
     if st.session_state.show_auth_modal:
         _, auth_col, _ = st.columns([1, 2, 1])
         with auth_col:
             if not supabase:
-                st.error("Veri tabanı bağlantısı henüz kurulamadı. Lütfen Streamlit Secrets alanını kontrol edin.")
+                st.error("Veri tabanı bağlantısı kurulamadı. Secrets ayarlarını kontrol edin.")
             else:
                 st.info("Devam etmek için hesabınıza giriş yapın veya kayıt olun.")
                 tab_login, tab_register = st.tabs(["🔑 Giriş Yap", "📝 Kayıt Ol"])
                 
-                # --- GİRİŞ YAP SEKMESİ ---
+                # GİRİŞ YAP
                 with tab_login:
                     email = st.text_input("E-Posta Adresi", key="l_email")
                     password = st.text_input("Şifre", type="password", key="l_pass")
@@ -82,20 +109,32 @@ if not st.session_state.user:
                                     "password": password
                                 })
                                 st.session_state.user = res.user
+                                # Metadata'dan profil bilgilerini yükle
+                                meta = res.user.user_metadata or {}
+                                st.session_state.profile_name = meta.get("full_name", clean_email.split('@')[0])
+                                st.session_state.birth_date = meta.get("birth_date", "2000-01-01")
+                                st.session_state.gender = meta.get("gender", "Belirtilmedi")
                                 st.session_state.show_auth_modal = False
                                 st.success("Giriş başarılı!")
                                 st.rerun()
                             except Exception as err:
                                 st.error("Giriş Başarısız: E-posta veya şifre hatalı.")
 
-                # --- KAYIT OL SEKMESİ ---
+                # KAYIT OL (EK BİLGİLERLE)
                 with tab_register:
+                    reg_name = st.text_input("Ad Soyad", key="r_name")
                     reg_email = st.text_input("E-Posta Adresi", key="r_email")
                     reg_pass = st.text_input("Şifre (En az 6 karakter)", type="password", key="r_pass")
                     reg_pass_conf = st.text_input("Şifre Tekrar", type="password", key="r_conf")
                     
+                    col_bdate, col_gnd = st.columns(2)
+                    with col_bdate:
+                        reg_bdate = st.date_input("Doğum Tarihi", key="r_bdate")
+                    with col_gnd:
+                        reg_gender = st.selectbox("Cinsiyet", ["Kadın", "Erkek", "Belirtmek İstemiyorum"], key="r_gnd")
+                    
                     if st.button("Kayıt Ol", key="btn_r"):
-                        if not reg_email or not reg_pass:
+                        if not reg_email or not reg_pass or not reg_name:
                             st.warning("Lütfen tüm alanları doldurun.")
                         elif reg_pass != reg_pass_conf:
                             st.error("Şifreler eşleşmiyor!")
@@ -106,8 +145,18 @@ if not st.session_state.user:
                                 clean_reg_email = reg_email.strip().lower()
                                 res = supabase.auth.sign_up({
                                     "email": clean_reg_email,
-                                    "password": reg_pass
+                                    "password": reg_pass,
+                                    "options": {
+                                        "data": {
+                                            "full_name": reg_name,
+                                            "birth_date": str(reg_bdate),
+                                            "gender": reg_gender
+                                        }
+                                    }
                                 })
+                                st.session_state.profile_name = reg_name
+                                st.session_state.birth_date = str(reg_bdate)
+                                st.session_state.gender = reg_gender
                                 st.success("Kayıt başarılı! Şimdi 'Giriş Yap' sekmesinden giriş yapabilirsiniz.")
                             except Exception as err:
                                 st.error(f"Kayıt Hatası: {err}")
@@ -117,29 +166,33 @@ if not st.session_state.user:
                 st.rerun()
         st.divider()
 
-    # Tanıtım Sayfası İçeriği (Landing Page)
     st.markdown("<h1 style='text-align: center;'>Kötü Alışkanlıklarından Kurtul, Hayatını Yeniden İnşa Et 🚀</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; font-size: 18px;'>Yapay zeka destekli kişisel koçun ile her gün geliş, hedeflerine ulaş ve motivasyonunu en üst seviyede tut.</p>", unsafe_allow_html=True)
-    
-    st.write(" ")
-    st.write(" ")
-    f1, f2, f3 = st.columns(3)
-    with f1:
-        st.markdown("### 🤖 **7/24 Yapay Zeka Koçu**")
-        st.write("Zorlandığın anlarda seni dinleyen ve sana özel çözümler sunan empatik asistan.")
-    with f2:
-        st.markdown("### 📈 **Gelişim Takibi**")
-        st.write("Kaçıncı günde olduğunu takip et. Başarılarını kaydet ve kararlılığını artır.")
-    with f3:
-        st.markdown("### 🔒 **Bulut Tabanlı Güvenlik**")
-        st.write("Verilerin Supabase altyapısı ile tamamen şifreli saklanır.")
 
-# --- 5. GİRİŞ YAPILMIŞSA (SOHBET VE PANEL) ---
+# --- 5. GİRİŞ YAPILMIŞSA (ANA UYGULAMA & PROFİL) ---
 else:
     user_email = st.session_state.user.email
+    display_name = st.session_state.profile_name if st.session_state.profile_name else user_email.split('@')[0]
     
-    # Sol Yan Menü (Sidebar)
-    st.sidebar.write(f"👤 **{user_email}**")
+    # SOL ÜST MENÜ (SIDEBAR)
+    st.sidebar.markdown("## ☰ **MENÜ**")
+    
+    # Profil Butonu (Tıklanınca Profilim Sayfasına Gider)
+    if st.sidebar.button(f"👤 {display_name} (Profilim)"):
+        st.session_state.sayfa = "👤 Profilim"
+        st.rerun()
+
+    st.sidebar.divider()
+    
+    # Menü Sayfa Seçimi
+    secilen_sayfa = st.sidebar.radio(
+        "Sayfalar:",
+        ["🌱 AI Koç & Sohbet", "📊 İlerlemelerim", "📜 AI Geçmişim", "👤 Profilim"],
+        index=["🌱 AI Koç & Sohbet", "📊 İlerlemelerim", "📜 AI Geçmişim", "👤 Profilim"].index(st.session_state.sayfa)
+    )
+    st.session_state.sayfa = secilen_sayfa
+    
+    st.sidebar.divider()
     
     if st.sidebar.button("🚪 Çıkış Yap"):
         if supabase:
@@ -148,49 +201,120 @@ else:
         st.session_state.messages = []
         st.rerun()
 
-    # DÜZELTİLEN SATIR: st.sidebar.hr() yerine st.sidebar.divider() kullanıldı.
-    st.sidebar.divider()
+    # --- SAYFA: PROFİLİM (INSTAGRAM TARZI) ---
+    if st.session_state.sayfa == "👤 Profilim":
+        st.title("👤 Profil Bilgilerim")
+        
+        col_p1, col_p2 = st.columns([1, 2])
+        
+        with col_p1:
+            st.subheader("Profil Fotoğrafı")
+            if st.session_state.profile_pic:
+                st.image(st.session_state.profile_pic, width=150)
+            else:
+                st.info("Henüz profil fotoğrafı yüklenmedi.")
+            
+            uploaded_file = st.file_uploader("Fotoğraf Değiştir (PNG/JPG)", type=["jpg", "jpeg", "png"])
+            if uploaded_file is not None:
+                bytes_data = uploaded_file.getvalue()
+                base64_image = f"data:image/png;base64,{base64.b64encode(bytes_data).decode()}"
+                st.session_state.profile_pic = base64_image
+                st.success("Profil fotoğrafı güncellendi! 📸")
+                st.rerun()
 
-    st.sidebar.header("İlerleme Durumun")
-    gun_sayisi = st.sidebar.number_input("Kaçıncı gündesin?", min_value=1, value=1)
-    st.sidebar.success(f"Tebrikler! {gun_sayisi}. günündesin! 🎉")
-
-    # Yapay Zeka Chat Ekranı
-    st.title("🌱 Alışkanlık & Motivasyon Asistanı")
-    st.write("Hoş geldin! Bugün nasıl hissediyorsun? Sana nasıl destek olabilirim?")
-
-    GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
-
-    if GROQ_API_KEY:
-        client = Groq(api_key=GROQ_API_KEY)
-
-        # Eski sohbet mesajlarını ekrana yazdır
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
-
-        # Kullanıcıdan mesaj al
-        if prompt := st.chat_input("Mesajınızı yazın..."):
-            st.chat_message("user").markdown(prompt)
-            st.session_state.messages.append({"role": "user", "content": prompt})
-
-            # AI Yanıtı Üret
-            with st.chat_message("assistant"):
+        with col_p2:
+            st.subheader("Kişisel Bilgiler")
+            
+            yeni_ad = st.text_input("Ad Soyad", value=st.session_state.profile_name)
+            st.text_input("E-Posta (Değiştirilemez)", value=user_email, disabled=True)
+            yeni_dogum = st.text_input("Doğum Tarihi", value=str(st.session_state.birth_date))
+            yeni_cinsiyet = st.selectbox("Cinsiyet", ["Kadın", "Erkek", "Belirtmek İstemiyorum"], 
+                                         index=["Kadın", "Erkek", "Belirtmek İstemiyorum"].index(st.session_state.gender) if st.session_state.gender in ["Kadın", "Erkek", "Belirtmek İstemiyorum"] else 2)
+            
+            if st.button("💾 Bilgileri Güncelle", type="primary"):
+                st.session_state.profile_name = yeni_ad
+                st.session_state.birth_date = yeni_dogum
+                st.session_state.gender = yeni_cinsiyet
+                
+                # Supabase tarafını da güncelle
                 try:
-                    system_prompt = f"Sen empatik, destekleyici ve motivasyon veren bir yaşam koçusun. Kullanıcının e-postası {user_email} ve kötü alışkanlıkla mücadelesinde {gun_sayisi}. gününde."
-                    
-                    chat_completion = client.chat.completions.create(
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": prompt}
-                        ],
-                        model="llama-3.3-70b-versatile",
-                    )
-                    
-                    ai_reply = chat_completion.choices[0].message.content
-                    st.markdown(ai_reply)
-                    st.session_state.messages.append({"role": "assistant", "content": ai_reply})
+                    supabase.auth.update_user({
+                        "data": {
+                            "full_name": yeni_ad,
+                            "birth_date": yeni_dogum,
+                            "gender": yeni_cinsiyet
+                        }
+                    })
+                    st.success("Profil bilgileriniz başarıyla kaydedildi! 🎉")
+                    st.rerun()
                 except Exception as e:
-                    st.error(f"Yapay zeka yanıt oluştururken bir sorun yaşandı: {e}")
-    else:
-        st.warning("Lütfen Streamlit Secrets kısmına GROQ_API_KEY ekleyin.")
+                    st.error(f"Güncelleme Hatası: {e}")
+
+    # --- SAYFA: AI KOÇ & SOHBET ---
+    elif st.session_state.sayfa == "🌱 AI Koç & Sohbet":
+        st.title("🌱 Alışkanlık & Motivasyon Asistanı")
+        st.write(f"Hoş geldin **{display_name}**! Bugün **{st.session_state.gun_sayisi}.** günündesin. Sana nasıl destek olabilirim?")
+
+        GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
+
+        if GROQ_API_KEY:
+            client = Groq(api_key=GROQ_API_KEY)
+
+            for message in st.session_state.messages:
+                with st.chat_message(message["role"]):
+                    st.markdown(message["content"])
+
+            if prompt := st.chat_input("Mesajınızı yazın..."):
+                st.chat_message("user").markdown(prompt)
+                st.session_state.messages.append({"role": "user", "content": prompt})
+
+                with st.chat_message("assistant"):
+                    try:
+                        system_prompt = f"Sen empatik, destekleyici ve motivasyon veren bir yaşam koçusun. Kullanıcının adı {display_name} ve mücadelesinde {st.session_state.gun_sayisi}. gününde."
+                        
+                        chat_completion = client.chat.completions.create(
+                            messages=[
+                                {"role": "system", "content": system_prompt},
+                                {"role": "user", "content": prompt}
+                            ],
+                            model="llama-3.3-70b-versatile",
+                        )
+                        
+                        ai_reply = chat_completion.choices[0].message.content
+                        st.markdown(ai_reply)
+                        st.session_state.messages.append({"role": "assistant", "content": ai_reply})
+                    except Exception as e:
+                        st.error(f"Yapay zeka yanıt oluştururken bir sorun yaşandı: {e}")
+        else:
+            st.warning("Lütfen Streamlit Secrets kısmına GROQ_API_KEY ekleyin.")
+
+    # --- SAYFA: İLERLEMELERİM ---
+    elif st.session_state.sayfa == "📊 İlerlemelerim":
+        st.title("📊 İlerleme ve Hedef Takibi")
+        st.divider()
+
+        yeni_gun = st.number_input(
+            "Kaçıncı gündesin?", 
+            min_value=1, 
+            value=int(st.session_state.gun_sayisi),
+            step=1
+        )
+        if yeni_gun != st.session_state.gun_sayisi:
+            st.session_state.gun_sayisi = yeni_gun
+            st.toast("Gün bilginiz güncellendi! 💾")
+
+        st.success(f"Tebrikler **{display_name}**! Kararlılıkla **{st.session_state.gun_sayisi}.** güne ulaştın! 🎉")
+        st.progress(min(st.session_state.gun_sayisi / 30, 1.0), text=f"30 Günlük Hedefin %{int((st.session_state.gun_sayisi/30)*100)} tamamlandı!")
+
+    # --- SAYFA: AI GEÇMİŞİM ---
+    elif st.session_state.sayfa == "📜 AI Geçmişim":
+        st.title("📜 AI Sohbet Geçmişim")
+        st.divider()
+
+        if not st.session_state.messages:
+            st.info("Henüz bir sohbet geçmişiniz bulunmuyor.")
+        else:
+            for i, msg in enumerate(st.session_state.messages, 1):
+                rol_ismi = f"👤 {display_name}" if msg["role"] == "user" else "🤖 AI Koç"
+                with st.expander(f"Mesaj #{i} - {rol_ismi}"):
+                    st.write(msg["content"])
