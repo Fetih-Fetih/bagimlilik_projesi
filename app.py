@@ -149,9 +149,9 @@ if not st.session_state.user:
                                 st.success("Giriş başarılı!")
                                 st.rerun()
                             except Exception as err:
-                                st.error("Giriş Başarısız: E-posta veya şifre hatalı.")
+                                st.error("Giriş Başarısız: E-posta/şifre hatalı veya hesabınız henüz doğrulanmamış.")
 
-                # KAYIT OL
+                # KAYIT OL (E-POSTA DOĞRULAMA UYARISI İLE)
                 with tab_register:
                     reg_name = st.text_input("Ad Soyad", key="r_name")
                     reg_email = st.text_input("E-Posta Adresi", key="r_email")
@@ -188,7 +188,7 @@ if not st.session_state.user:
                                 st.session_state.profile_name = reg_name
                                 st.session_state.birth_date = str(reg_bdate)
                                 st.session_state.gender = reg_gender
-                                st.success("Kayıt başarılı! Şimdi 'Giriş Yap' sekmesinden giriş yapabilirsiniz.")
+                                st.success("📧 Kayıt başarılı! Lütfen e-posta kutunuzu (ve spam klasörünü) kontrol ederek hesabınızı doğrulayın. Ardından giriş yapabilirsiniz.")
                             except Exception as err:
                                 st.error(f"Kayıt Hatası: {err}")
 
@@ -379,7 +379,7 @@ else:
         st.success(f"Tebrikler **{display_name}**! Kararlılıkla **{st.session_state.gun_sayisi}.** güne ulaştın! 🎉")
         st.progress(min(st.session_state.gun_sayisi / 30, 1.0), text=f"30 Günlük Hedefin %{int((st.session_state.gun_sayisi/30)*100)} tamamlandı!")
 
-    # --- SAYFA: AI GEÇMİŞİM (SADECE BAŞLIKLAR LİSTESİ) ---
+    # --- SAYFA: AI GEÇMİŞİM ---
     elif st.session_state.sayfa == "📜 AI Geçmişim":
         st.title("📜 AI Sohbet Geçmişim")
         st.write("Eski sohbet başlıklarınız aşağıda listelenmiştir. Devam etmek istediğiniz sohbetin yanındaki butona tıklayın:")
