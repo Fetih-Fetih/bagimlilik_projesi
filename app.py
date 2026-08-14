@@ -2,6 +2,7 @@ import streamlit as st
 from supabase import create_client, Client
 from groq import Groq
 import base64
+import uuid
 
 # --- 1. SAYFA VE TASARIM AYARLARI ---
 st.set_page_config(
@@ -11,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# CSS ile Sol Üstteki Yeşil "☰ Menü" Butonunun Tasarımı
+# CSS Tasarımları
 st.markdown("""
     <style>
     footer {visibility: hidden;}
@@ -49,7 +50,6 @@ supabase = get_supabase_client()
 if "user" not in st.session_state:
     st.session_state.user = None
 
-# Sayfa yenilendiğinde Supabase aktif oturumunu kontrol et (Otomatik Giriş Kalıcılığı)
 if supabase and not st.session_state.user:
     try:
         session = supabase.auth.get_session()
@@ -62,8 +62,14 @@ if supabase and not st.session_state.user:
     except Exception:
         pass
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+# --- SOHBET GRUPLAMA MİMARİSİ (CHAT HISTORY DATABASE) ---
+if "chats" not in st.session_state:
+    # Yapı: { session_id: {"title": "Sohbet Başlığı", "messages": [...] } }
+    st.session_state.chats = {}
+
+if "current_chat_id" not in st.session_state:
+    st.session_state.current_chat_id = None
+
 if "show_auth_modal" not in st.session_state:
     st.session_state.show_auth_modal = False
 if "gun_sayisi" not in st.session_state:
@@ -73,7 +79,7 @@ if "sayfa" not in st.session_state:
 if "sidebar_open" not in st.session_state:
     st.session_state.sidebar_open = False
 
-# Profil Bilgileri İlk Tanımlamaları
+# Profil Bilgileri
 if "profile_name" not in st.session_state:
     st.session_state.profile_name = ""
 if "profile_pic" not in st.session_state:
@@ -225,7 +231,8 @@ else:
                 if supabase:
                     supabase.auth.sign_out()
                 st.session_state.user = None
-                st.session_state.messages = []
+                st.session_state.chats = {}
+                st.session_state.current_chat_id = None
                 st.session_state.sidebar_open = False
                 st.rerun()
 
@@ -285,37 +292,64 @@ else:
 
     # --- SAYFA: AI KOÇ & SOHBET ---
     elif st.session_state.sayfa == "🌱 AI Koç & Sohbet":
-        st.title("🌱 Alışkanlık & Motivasyon Asistanı")
-        st.write(f"Hoş geldin **{display_name}**! Bugün **{st.session_state.gun_sayisi}.** günündesin. Sana nasıl destek olabilirim?")
+        
+        col_title, col_new_btn = st.columns([4, 1])
+        with col_title:
+            st.title("🌱 Alışkanlık & Motivasyon Asistanı")
+        with col_new_btn:
+            if st.button("➕ Yeni Sohbet Başlat"):
+                st.session_state.current_chat_id = None
+                st.rerun()
+
+        st.caption(f"Hoş geldin **{display_name}**! Bugün **{st.session_state.gun_sayisi}.** günündesin.")
 
         GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
 
         if GROQ_API_KEY:
             client = Groq(api_key=GROQ_API_KEY)
 
-            for message in st.session_state.messages:
+            # Eğer aktif sohbet varsa onun mesajlarını yükle
+            current_messages = []
+            if st.session_state.current_chat_id and st.session_state.current_chat_id in st.session_state.chats:
+                current_messages = st.session_state.chats[st.session_state.current_chat_id]["messages"]
+
+            for message in current_messages:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
 
             if prompt := st.chat_input("Mesajınızı yazın..."):
+                # Yeni bir sohbet oturumu başlatılıyorsa ID oluştur
+                if not st.session_state.current_chat_id:
+                    new_id = str(uuid.uuid4())
+                    st.session_state.current_chat_id = new_id
+                    # İlk mesaja göre başlık belirleme (İlk 30 karakter)
+                    title = prompt[:30] + ("..." if len(prompt) > 30 else "")
+                    st.session_state.chats[new_id] = {
+                        "title": title,
+                        "messages": []
+                    }
+
+                # Kullanıcı mesajını kaydet
                 st.chat_message("user").markdown(prompt)
-                st.session_state.messages.append({"role": "user", "content": prompt})
+                st.session_state.chats[st.session_state.current_chat_id]["messages"].append({"role": "user", "content": prompt})
 
                 with st.chat_message("assistant"):
                     try:
                         system_prompt = f"Sen empatik, destekleyici ve motivasyon veren bir yaşam koçusun. Kullanıcının adı {display_name} ve mücadelesinde {st.session_state.gun_sayisi}. gününde."
                         
+                        # Geçmiş konuşmaları API'ye ileterek bağlamı koru
+                        api_messages = [{"role": "system", "content": system_prompt}]
+                        for msg in st.session_state.chats[st.session_state.current_chat_id]["messages"]:
+                            api_messages.append({"role": msg["role"], "content": msg["content"]})
+
                         chat_completion = client.chat.completions.create(
-                            messages=[
-                                {"role": "system", "content": system_prompt},
-                                {"role": "user", "content": prompt}
-                            ],
+                            messages=api_messages,
                             model="llama-3.3-70b-versatile",
                         )
                         
                         ai_reply = chat_completion.choices[0].message.content
                         st.markdown(ai_reply)
-                        st.session_state.messages.append({"role": "assistant", "content": ai_reply})
+                        st.session_state.chats[st.session_state.current_chat_id]["messages"].append({"role": "assistant", "content": ai_reply})
                     except Exception as e:
                         st.error(f"Yapay zeka yanıt oluştururken bir sorun yaşandı: {e}")
         else:
@@ -339,15 +373,26 @@ else:
         st.success(f"Tebrikler **{display_name}**! Kararlılıkla **{st.session_state.gun_sayisi}.** güne ulaştın! 🎉")
         st.progress(min(st.session_state.gun_sayisi / 30, 1.0), text=f"30 Günlük Hedefin %{int((st.session_state.gun_sayisi/30)*100)} tamamlandı!")
 
-    # --- SAYFA: AI GEÇMİŞİM ---
+    # --- SAYFA: AI GEÇMİŞİM (BAŞLIKLI & GRUPLU) ---
     elif st.session_state.sayfa == "📜 AI Geçmişim":
         st.title("📜 AI Sohbet Geçmişim")
+        st.write("Daha önceki tüm sohbetlerinize buradan erişebilir ve kaldığınız yerden devam edebilirsiniz:")
         st.divider()
 
-        if not st.session_state.messages:
-            st.info("Henüz bir sohbet geçmişiniz bulunmuyor.")
+        if not st.session_state.chats:
+            st.info("Henüz bir sohbet geçmişiniz bulunmuyor. AI Koç sekmesinden yeni bir sohbet başlatabilirsiniz.")
         else:
-            for i, msg in enumerate(st.session_state.messages, 1):
-                rol_ismi = f"👤 {display_name}" if msg["role"] == "user" else "🤖 AI Koç"
-                with st.expander(f"Mesaj #{i} - {rol_ismi}"):
-                    st.write(msg["content"])
+            for chat_id, chat_data in list(st.session_state.chats.items()):
+                with st.expander(f"💬 {chat_data['title']}"):
+                    st.caption(f"Toplam {len(chat_data['messages'])} mesaj")
+                    
+                    # Sohbet Önizlemesi
+                    for msg in chat_data["messages"]:
+                        rol_ismi = f"👤 {display_name}" if msg["role"] == "user" else "🤖 AI Koç"
+                        st.markdown(f"**{rol_ismi}:** {msg['content']}")
+                    
+                    st.write("")
+                    if st.button("💬 Bu Sohbete Devam Et", key=f"btn_continue_{chat_id}"):
+                        st.session_state.current_chat_id = chat_id
+                        st.session_state.sayfa = "🌱 AI Koç & Sohbet"
+                        st.rerun()
