@@ -3,6 +3,7 @@ from supabase import create_client, Client
 from groq import Groq
 import base64
 import uuid
+from datetime import datetime
 
 # --- 1. SAYFA VE TASARIM AYARLARI ---
 st.set_page_config(
@@ -28,6 +29,15 @@ st.markdown("""
         border-radius: 8px !important;
         padding: 8px 16px !important;
         box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+    }
+    
+    /* Geçmiş Sohbet Kartı Tasarımı */
+    .chat-card {
+        background-color: #f9f9f9;
+        padding: 15px;
+        border-radius: 10px;
+        border-left: 5px solid #2e7d32;
+        margin-bottom: 10px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -62,9 +72,8 @@ if supabase and not st.session_state.user:
     except Exception:
         pass
 
-# --- SOHBET GRUPLAMA MİMARİSİ (CHAT HISTORY DATABASE) ---
+# --- SOHBET GRUPLAMA MİMARİSİ ---
 if "chats" not in st.session_state:
-    # Yapı: { session_id: {"title": "Sohbet Başlığı", "messages": [...] } }
     st.session_state.chats = {}
 
 if "current_chat_id" not in st.session_state:
@@ -89,7 +98,7 @@ if "birth_date" not in st.session_state:
 if "gender" not in st.session_state:
     st.session_state.gender = "Belirtilmedi"
 
-# --- 4. GİRİŞ YAPILMAMIŞSA (LANDING PAGE & AUTH) ---
+# --- 4. GİRİŞ YAPILMAMIŞSA ---
 if not st.session_state.user:
     
     col_logo, col_space, col_login, col_register = st.columns([3, 4, 1.5, 1.5])
@@ -191,7 +200,7 @@ if not st.session_state.user:
     st.markdown("<h1 style='text-align: center;'>Kötü Alışkanlıklarından Kurtul, Hayatını Yeniden İnşa Et 🚀</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; font-size: 18px;'>Yapay zeka destekli kişisel koçun ile her gün geliş, hedeflerine ulaş ve motivasyonunu en üst seviyede tut.</p>", unsafe_allow_html=True)
 
-# --- 5. GİRİŞ YAPILMIŞSA (ANA UYGULAMA) ---
+# --- 5. GİRİŞ YAPILMIŞSA ---
 else:
     user_email = st.session_state.user.email
     display_name = st.session_state.profile_name if st.session_state.profile_name else user_email.split('@')[0]
@@ -293,11 +302,11 @@ else:
     # --- SAYFA: AI KOÇ & SOHBET ---
     elif st.session_state.sayfa == "🌱 AI Koç & Sohbet":
         
-        col_title, col_new_btn = st.columns([4, 1])
+        col_title, col_new_btn = st.columns([4, 1.2])
         with col_title:
             st.title("🌱 Alışkanlık & Motivasyon Asistanı")
         with col_new_btn:
-            if st.button("➕ Yeni Sohbet Başlat"):
+            if st.button("➕ Yeni Sohbet"):
                 st.session_state.current_chat_id = None
                 st.rerun()
 
@@ -308,7 +317,6 @@ else:
         if GROQ_API_KEY:
             client = Groq(api_key=GROQ_API_KEY)
 
-            # Eğer aktif sohbet varsa onun mesajlarını yükle
             current_messages = []
             if st.session_state.current_chat_id and st.session_state.current_chat_id in st.session_state.chats:
                 current_messages = st.session_state.chats[st.session_state.current_chat_id]["messages"]
@@ -318,18 +326,17 @@ else:
                     st.markdown(message["content"])
 
             if prompt := st.chat_input("Mesajınızı yazın..."):
-                # Yeni bir sohbet oturumu başlatılıyorsa ID oluştur
                 if not st.session_state.current_chat_id:
                     new_id = str(uuid.uuid4())
                     st.session_state.current_chat_id = new_id
-                    # İlk mesaja göre başlık belirleme (İlk 30 karakter)
-                    title = prompt[:30] + ("..." if len(prompt) > 30 else "")
+                    title = prompt[:35] + ("..." if len(prompt) > 35 else "")
+                    now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
                     st.session_state.chats[new_id] = {
                         "title": title,
+                        "date": now_str,
                         "messages": []
                     }
 
-                # Kullanıcı mesajını kaydet
                 st.chat_message("user").markdown(prompt)
                 st.session_state.chats[st.session_state.current_chat_id]["messages"].append({"role": "user", "content": prompt})
 
@@ -337,7 +344,6 @@ else:
                     try:
                         system_prompt = f"Sen empatik, destekleyici ve motivasyon veren bir yaşam koçusun. Kullanıcının adı {display_name} ve mücadelesinde {st.session_state.gun_sayisi}. gününde."
                         
-                        # Geçmiş konuşmaları API'ye ileterek bağlamı koru
                         api_messages = [{"role": "system", "content": system_prompt}]
                         for msg in st.session_state.chats[st.session_state.current_chat_id]["messages"]:
                             api_messages.append({"role": msg["role"], "content": msg["content"]})
@@ -373,26 +379,26 @@ else:
         st.success(f"Tebrikler **{display_name}**! Kararlılıkla **{st.session_state.gun_sayisi}.** güne ulaştın! 🎉")
         st.progress(min(st.session_state.gun_sayisi / 30, 1.0), text=f"30 Günlük Hedefin %{int((st.session_state.gun_sayisi/30)*100)} tamamlandı!")
 
-    # --- SAYFA: AI GEÇMİŞİM (BAŞLIKLI & GRUPLU) ---
+    # --- SAYFA: AI GEÇMİŞİM (SADECE BAŞLIKLAR LİSTESİ) ---
     elif st.session_state.sayfa == "📜 AI Geçmişim":
         st.title("📜 AI Sohbet Geçmişim")
-        st.write("Daha önceki tüm sohbetlerinize buradan erişebilir ve kaldığınız yerden devam edebilirsiniz:")
+        st.write("Eski sohbet başlıklarınız aşağıda listelenmiştir. Devam etmek istediğiniz sohbetin yanındaki butona tıklayın:")
         st.divider()
 
         if not st.session_state.chats:
-            st.info("Henüz bir sohbet geçmişiniz bulunmuyor. AI Koç sekmesinden yeni bir sohbet başlatabilirsiniz.")
+            st.info("Henüz geçmiş bir sohbetiniz bulunmuyor.")
         else:
-            for chat_id, chat_data in list(st.session_state.chats.items()):
-                with st.expander(f"💬 {chat_data['title']}"):
-                    st.caption(f"Toplam {len(chat_data['messages'])} mesaj")
-                    
-                    # Sohbet Önizlemesi
-                    for msg in chat_data["messages"]:
-                        rol_ismi = f"👤 {display_name}" if msg["role"] == "user" else "🤖 AI Koç"
-                        st.markdown(f"**{rol_ismi}:** {msg['content']}")
-                    
-                    st.write("")
-                    if st.button("💬 Bu Sohbete Devam Et", key=f"btn_continue_{chat_id}"):
+            for chat_id, chat_data in reversed(list(st.session_state.chats.items())):
+                col_info, col_btn = st.columns([4, 1.2])
+                
+                with col_info:
+                    st.markdown(f"### 💬 {chat_data['title']}")
+                    st.caption(f"📅 {chat_data.get('date', 'Tarih Yok')} | 💬 {len(chat_data['messages'])} Mesaj")
+                
+                with col_btn:
+                    if st.button("💬 Sohbete Git", key=f"btn_go_{chat_id}"):
                         st.session_state.current_chat_id = chat_id
                         st.session_state.sayfa = "🌱 AI Koç & Sohbet"
                         st.rerun()
+                
+                st.divider()
