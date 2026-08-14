@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# CSS ile Sol Üstteki Özel Yeşil Kutulu "☰ Menü" Butonunun Tasarımı
+# CSS ile Sol Üstteki Yeşil "☰ Menü" Butonunun Tasarımı
 st.markdown("""
     <style>
     footer {visibility: hidden;}
@@ -27,17 +27,6 @@ st.markdown("""
         border-radius: 8px !important;
         padding: 8px 16px !important;
         box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
-    }
-    
-    /* Yan Menü Üst Başlığı */
-    .sidebar-header {
-        background-color: #2e7d32;
-        color: white;
-        padding: 10px;
-        border-radius: 8px;
-        text-align: center;
-        font-weight: bold;
-        margin-bottom: 15px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -56,9 +45,23 @@ def get_supabase_client():
 
 supabase = get_supabase_client()
 
-# --- 3. OTURUM DURUMLARI (SESSION STATE) ---
+# --- 3. OTURUM VE SESSION OTOMATİK KONTROLÜ ---
 if "user" not in st.session_state:
     st.session_state.user = None
+
+# Sayfa yenilendiğinde Supabase aktif oturumunu kontrol et (Otomatik Giriş Kalıcılığı)
+if supabase and not st.session_state.user:
+    try:
+        session = supabase.auth.get_session()
+        if session and session.user:
+            st.session_state.user = session.user
+            meta = session.user.user_metadata or {}
+            st.session_state.profile_name = meta.get("full_name", session.user.email.split('@')[0])
+            st.session_state.birth_date = meta.get("birth_date", "2000-01-01")
+            st.session_state.gender = meta.get("gender", "Belirtilmedi")
+    except Exception:
+        pass
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "show_auth_modal" not in st.session_state:
@@ -70,7 +73,7 @@ if "sayfa" not in st.session_state:
 if "sidebar_open" not in st.session_state:
     st.session_state.sidebar_open = False
 
-# Profil Bilgileri
+# Profil Bilgileri İlk Tanımlamaları
 if "profile_name" not in st.session_state:
     st.session_state.profile_name = ""
 if "profile_pic" not in st.session_state:
@@ -187,7 +190,7 @@ else:
     user_email = st.session_state.user.email
     display_name = st.session_state.profile_name if st.session_state.profile_name else user_email.split('@')[0]
     
-    # SOL ÜSTTEKİ YEŞİL "☰ MENÜ" KUTUSU
+    # SOL ÜSTTEKİ YEŞİL "☰ Menü" KUTUSU
     col_menu_btn, _ = st.columns([1, 6])
     with col_menu_btn:
         if st.button("☰ Menü", key="btn_toggle_sidebar"):
@@ -196,8 +199,6 @@ else:
     # Menü Açıksa Yan Paneli Göster
     if st.session_state.sidebar_open:
         with st.sidebar:
-            st.markdown('<div class="sidebar-header">☰ KONTROL PANELİ</div>', unsafe_allow_html=True)
-            
             if st.button("✖ Menüyü Kapat"):
                 st.session_state.sidebar_open = False
                 st.rerun()
