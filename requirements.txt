@@ -1,3 +1,5 @@
 streamlit
 groq
-supabase
+supabase==2.4.0
+gotrue==2.4.0
+httpx<0.28.0
