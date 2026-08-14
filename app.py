@@ -4,28 +4,40 @@ from groq import Groq
 import base64
 
 # --- 1. SAYFA VE TASARIM AYARLARI ---
-st.set_page_config(page_title="Alışkanlık Asistanı", page_icon="🌱", layout="wide")
+# initial_sidebar_state="collapsed" ile menüyü BAŞLANGIÇTA KAPALI tutuyoruz.
+st.set_page_config(
+    page_title="Alışkanlık Asistanı", 
+    page_icon="🌱", 
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-# CSS ile Profil Kartı ve Temiz Arayüz Tasarımı
+# CSS ile Sol Üstteki Menü Açma Düğmesini (Üç Çizgi) Çok Daha Belirgin Yapıyoruz
 st.markdown("""
     <style>
     footer {visibility: hidden;}
     header {visibility: hidden;}
     .stButton>button { width: 100%; }
-    .profile-card {
-        background-color: #f8f9fa;
-        padding: 20px;
-        border-radius: 15px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        text-align: center;
-        margin-bottom: 20px;
+    
+    /* Sol üstteki menü açma butonunu (üç çizgi/ok) belirginleştirme */
+    [data-testid="stSidebarCollapseButton"] {
+        background-color: #2e7d32 !important;
+        color: white !important;
+        border-radius: 8px !important;
+        padding: 5px !important;
+        margin-top: 10px !important;
+        margin-left: 10px !important;
     }
-    .profile-img {
-        width: 120px;
-        height: 120px;
-        border-radius: 50%;
-        object-fit: cover;
-        border: 3px solid #4CAF50;
+    
+    /* Açılan menü üst başlığı */
+    .sidebar-header {
+        background-color: #2e7d32;
+        color: white;
+        padding: 10px;
+        border-radius: 8px;
+        text-align: center;
+        font-weight: bold;
+        margin-bottom: 15px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -109,7 +121,6 @@ if not st.session_state.user:
                                     "password": password
                                 })
                                 st.session_state.user = res.user
-                                # Metadata'dan profil bilgilerini yükle
                                 meta = res.user.user_metadata or {}
                                 st.session_state.profile_name = meta.get("full_name", clean_email.split('@')[0])
                                 st.session_state.birth_date = meta.get("birth_date", "2000-01-01")
@@ -120,7 +131,7 @@ if not st.session_state.user:
                             except Exception as err:
                                 st.error("Giriş Başarısız: E-posta veya şifre hatalı.")
 
-                # KAYIT OL (EK BİLGİLERLE)
+                # KAYIT OL (DOĞUM TARİHİ VE CİNSİYET İLE)
                 with tab_register:
                     reg_name = st.text_input("Ad Soyad", key="r_name")
                     reg_email = st.text_input("E-Posta Adresi", key="r_email")
@@ -169,24 +180,22 @@ if not st.session_state.user:
     st.markdown("<h1 style='text-align: center;'>Kötü Alışkanlıklarından Kurtul, Hayatını Yeniden İnşa Et 🚀</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; font-size: 18px;'>Yapay zeka destekli kişisel koçun ile her gün geliş, hedeflerine ulaş ve motivasyonunu en üst seviyede tut.</p>", unsafe_allow_html=True)
 
-# --- 5. GİRİŞ YAPILMIŞSA (ANA UYGULAMA & PROFİL) ---
+# --- 5. GİRİŞ YAPILMIŞSA (ANA UYGULAMA) ---
 else:
     user_email = st.session_state.user.email
     display_name = st.session_state.profile_name if st.session_state.profile_name else user_email.split('@')[0]
     
-    # SOL ÜST MENÜ (SIDEBAR)
-    st.sidebar.markdown("## ☰ **MENÜ**")
+    # SOL AÇILIR MENÜ (AÇILINCA GÖRÜNEN İÇERİK)
+    st.sidebar.markdown('<div class="sidebar-header">☰ MENÜ & KONTROL PANELİ</div>', unsafe_allow_html=True)
     
-    # Profil Butonu (Tıklanınca Profilim Sayfasına Gider)
-    if st.sidebar.button(f"👤 {display_name} (Profilim)"):
+    if st.sidebar.button("⚙️ Profilimi Düzenle"):
         st.session_state.sayfa = "👤 Profilim"
         st.rerun()
 
     st.sidebar.divider()
     
-    # Menü Sayfa Seçimi
     secilen_sayfa = st.sidebar.radio(
-        "Sayfalar:",
+        "📌 Sayfalar",
         ["🌱 AI Koç & Sohbet", "📊 İlerlemelerim", "📜 AI Geçmişim", "👤 Profilim"],
         index=["🌱 AI Koç & Sohbet", "📊 İlerlemelerim", "📜 AI Geçmişim", "👤 Profilim"].index(st.session_state.sayfa)
     )
@@ -201,20 +210,22 @@ else:
         st.session_state.messages = []
         st.rerun()
 
-    # --- SAYFA: PROFİLİM (INSTAGRAM TARZI) ---
+    # --- SAYFA: PROFİLİM ---
     if st.session_state.sayfa == "👤 Profilim":
         st.title("👤 Profil Bilgilerim")
+        st.write("Profil bilgilerinizi ve profil fotoğrafınızı buradan düzenleyebilirsiniz.")
+        st.divider()
         
         col_p1, col_p2 = st.columns([1, 2])
         
         with col_p1:
             st.subheader("Profil Fotoğrafı")
             if st.session_state.profile_pic:
-                st.image(st.session_state.profile_pic, width=150)
+                st.image(st.session_state.profile_pic, width=160)
             else:
                 st.info("Henüz profil fotoğrafı yüklenmedi.")
             
-            uploaded_file = st.file_uploader("Fotoğraf Değiştir (PNG/JPG)", type=["jpg", "jpeg", "png"])
+            uploaded_file = st.file_uploader("Fotoğraf Yükle/Değiştir", type=["jpg", "jpeg", "png"])
             if uploaded_file is not None:
                 bytes_data = uploaded_file.getvalue()
                 base64_image = f"data:image/png;base64,{base64.b64encode(bytes_data).decode()}"
@@ -228,15 +239,18 @@ else:
             yeni_ad = st.text_input("Ad Soyad", value=st.session_state.profile_name)
             st.text_input("E-Posta (Değiştirilemez)", value=user_email, disabled=True)
             yeni_dogum = st.text_input("Doğum Tarihi", value=str(st.session_state.birth_date))
-            yeni_cinsiyet = st.selectbox("Cinsiyet", ["Kadın", "Erkek", "Belirtmek İstemiyorum"], 
-                                         index=["Kadın", "Erkek", "Belirtmek İstemiyorum"].index(st.session_state.gender) if st.session_state.gender in ["Kadın", "Erkek", "Belirtmek İstemiyorum"] else 2)
             
-            if st.button("💾 Bilgileri Güncelle", type="primary"):
+            cinsiyet_index = 2
+            if st.session_state.gender == "Kadın": cinsiyet_index = 0
+            elif st.session_state.gender == "Erkek": cinsiyet_index = 1
+            
+            yeni_cinsiyet = st.selectbox("Cinsiyet", ["Kadın", "Erkek", "Belirtmek İstemiyorum"], index=cinsiyet_index)
+            
+            if st.button("💾 Bilgileri Kaydet", type="primary"):
                 st.session_state.profile_name = yeni_ad
                 st.session_state.birth_date = yeni_dogum
                 st.session_state.gender = yeni_cinsiyet
                 
-                # Supabase tarafını da güncelle
                 try:
                     supabase.auth.update_user({
                         "data": {
@@ -245,7 +259,7 @@ else:
                             "gender": yeni_cinsiyet
                         }
                     })
-                    st.success("Profil bilgileriniz başarıyla kaydedildi! 🎉")
+                    st.success("Profil bilgileriniz kaydedildi! 🎉")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Güncelleme Hatası: {e}")
