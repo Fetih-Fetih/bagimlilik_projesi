@@ -1218,4 +1218,3 @@ else:
         st.caption(
             "E-posta adresi değiştirilemez."
         )
-```
