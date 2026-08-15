@@ -10,7 +10,7 @@ st.set_page_config(
     page_title="Alışkanlık Asistanı", 
     page_icon="🌱", 
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded" # Otomatik açılır/kapanır kenar çubuğu
 )
 
 # CSS Tasarımları
@@ -20,18 +20,6 @@ st.markdown("""
     header {visibility: hidden;}
     .stButton>button { width: 100%; }
     
-    /* Sol üstteki sabit Yeşil Menü Kutusu */
-    div[data-testid="stColumn"] button[key="btn_toggle_sidebar"] {
-        background-color: #2e7d32 !important;
-        color: #ffffff !important;
-        font-weight: bold !important;
-        border: none !important;
-        border-radius: 8px !important;
-        padding: 8px 16px !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
-    }
-    
-    /* Geçmiş Sohbet Kartı Tasarımı */
     .chat-card {
         background-color: #f9f9f9;
         padding: 15px;
@@ -56,7 +44,7 @@ def get_supabase_client():
 
 supabase = get_supabase_client()
 
-# --- 3. OTURUM VE SESSION OTOMATİK KONTROLÜ ---
+# --- 3. OTURUM KONTROLÜ ---
 if "user" not in st.session_state:
     st.session_state.user = None
 
@@ -72,7 +60,7 @@ if supabase and not st.session_state.user:
     except Exception:
         pass
 
-# --- SOHBET GRUPLAMA MİMARİSİ ---
+# SOHBET VE DEĞİŞKEN MİMARİSİ
 if "chats" not in st.session_state:
     st.session_state.chats = {}
 
@@ -85,8 +73,6 @@ if "gun_sayisi" not in st.session_state:
     st.session_state.gun_sayisi = 1
 if "sayfa" not in st.session_state:
     st.session_state.sayfa = "🌱 AI Koç & Sohbet"
-if "sidebar_open" not in st.session_state:
-    st.session_state.sidebar_open = False
 
 # Profil Bilgileri
 if "profile_name" not in st.session_state:
@@ -188,7 +174,7 @@ if not st.session_state.user:
                                 st.session_state.profile_name = reg_name
                                 st.session_state.birth_date = str(reg_bdate)
                                 st.session_state.gender = reg_gender
-                                st.success("📧 Kayıt başarılı! Lütfen e-posta kutunuzu (ve spam klasörünü) kontrol ederek hesabınızı doğrulayın. Ardından giriş yapabilirsiniz.")
+                                st.success("📧 Kayıt başarılı! Lütfen e-posta kutunuzu kontrol edin.")
                             except Exception as err:
                                 st.error(f"Kayıt Hatası: {err}")
 
@@ -197,7 +183,7 @@ if not st.session_state.user:
                 st.rerun()
         st.divider()
 
-    # --- YENİ SLOGANLAR (GİRİŞ EKRANI) ---
+    # SLOGANLAR
     st.markdown("<h1 style='text-align: center;'>Ekrandan çıkışını değil, gerçek hayata girişini keşfet 🚀</h1>", unsafe_allow_html=True)
     st.markdown("<h3 style='text-align: center; color: #2e7d32;'>Kaçmak değil, yeniden bağlanmak</h3>", unsafe_allow_html=True)
     st.write("")
@@ -215,45 +201,34 @@ else:
     user_email = st.session_state.user.email
     display_name = st.session_state.profile_name if st.session_state.profile_name else user_email.split('@')[0]
     
-    # SOL ÜSTTEKİ YEŞİL "☰ Menü" KUTUSU
-    col_menu_btn, _ = st.columns([1, 6])
-    with col_menu_btn:
-        if st.button("☰ Menü", key="btn_toggle_sidebar"):
-            st.session_state.sidebar_open = not st.session_state.sidebar_open
+    # MENÜ (SIDEBAR) Doğrudan Tanımlama
+    with st.sidebar:
+        st.title("📌 Menü")
+        st.write(f"Sistemdeki Kullanıcı: **{display_name}**")
+        st.divider()
 
-    # Menü Açıksa Yan Paneli Göster
-    if st.session_state.sidebar_open:
-        with st.sidebar:
-            if st.button("✖ Menüyü Kapat"):
-                st.session_state.sidebar_open = False
-                st.rerun()
+        if st.button("⚙️ Profilimi Düzenle"):
+            st.session_state.sayfa = "👤 Profilim"
+            st.rerun()
 
-            st.divider()
-
-            if st.button("⚙️ Profilimi Düzenle"):
-                st.session_state.sayfa = "👤 Profilim"
-                st.session_state.sidebar_open = False
-                st.rerun()
-
-            st.divider()
-            
-            secilen_sayfa = st.radio(
-                "📌 Sayfalar",
-                ["🌱 AI Koç & Sohbet", "📊 İlerlemelerim", "📜 AI Geçmişim", "👤 Profilim"],
-                index=["🌱 AI Koç & Sohbet", "📊 İlerlemelerim", "📜 AI Geçmişim", "👤 Profilim"].index(st.session_state.sayfa)
-            )
-            st.session_state.sayfa = secilen_sayfa
-            
-            st.divider()
-            
-            if st.button("🚪 Çıkış Yap"):
-                if supabase:
-                    supabase.auth.sign_out()
-                st.session_state.user = None
-                st.session_state.chats = {}
-                st.session_state.current_chat_id = None
-                st.session_state.sidebar_open = False
-                st.rerun()
+        st.divider()
+        
+        secilen_sayfa = st.radio(
+            "Sayfalar",
+            ["🌱 AI Koç & Sohbet", "📊 İlerlemelerim", "📜 AI Geçmişim", "👤 Profilim"],
+            index=["🌱 AI Koç & Sohbet", "📊 İlerlemelerim", "📜 AI Geçmişim", "👤 Profilim"].index(st.session_state.sayfa)
+        )
+        st.session_state.sayfa = secilen_sayfa
+        
+        st.divider()
+        
+        if st.button("🚪 Çıkış Yap"):
+            if supabase:
+                supabase.auth.sign_out()
+            st.session_state.user = None
+            st.session_state.chats = {}
+            st.session_state.current_chat_id = None
+            st.rerun()
 
     # --- SAYFA: PROFİLİM ---
     if st.session_state.sayfa == "👤 Profilim":
