@@ -287,7 +287,6 @@ def save_message_to_db(chat_id: str, role: str, content: str) -> None:
         return
 
     try:
-        # Önce sohbetin gerçekten bu kullanıcıya ait olduğunu kontrol et
         chat_check = (
             supabase.table("chats")
             .select("user_id")
@@ -470,75 +469,186 @@ if st.session_state.user is None and not st.session_state.get("auth_restore_done
 
 if not st.session_state.user:
 
-    # CSS ile arka plan gradyanı ve animasyonlar
+    # CSS ile scroll animasyonları
     st.markdown("""
     <style>
-    .main-header {
-        background: linear-gradient(180deg, #1a1a2e 0%, #16213e 30%, #0f3460 60%, #533483 80%, #e0e0e0 100%);
-        padding: 80px 20px 60px 20px;
-        border-radius: 20px;
+    .hero-section {
+        background: linear-gradient(180deg, #000000 0%, #1a1a2e 50%, #16213e 100%);
+        min-height: 100vh;
+        padding: 60px 20px;
         text-align: center;
-        margin-bottom: 30px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
     }
     
-    .main-title {
+    .hero-title {
         color: white;
-        font-size: 2.8rem;
+        font-size: 4rem;
         font-weight: bold;
         margin-bottom: 20px;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        opacity: 0;
+        animation: fadeInUp 1.5s forwards;
+        animation-delay: 0.3s;
     }
     
-    .main-subtitle {
-        color: #e0e0e0;
-        font-size: 1.3rem;
-        margin-bottom: 30px;
+    .hero-subtitle {
+        color: #a0a0a0;
+        font-size: 1.5rem;
+        margin-bottom: 40px;
+        opacity: 0;
+        animation: fadeInUp 1.5s forwards;
+        animation-delay: 0.8s;
     }
     
-    .slogan-section {
-        padding: 40px 20px;
-        margin: 20px 0;
-        border-radius: 15px;
+    .scroll-indicator {
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: white;
+        font-size: 2rem;
+        animation: bounce 2s infinite;
+        opacity: 0.7;
+    }
+    
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(50px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    @keyframes bounce {
+        0%, 20%, 50%, 80%, 100% {
+            transform: translateY(0) translateX(-50%);
+        }
+        40% {
+            transform: translateY(-20px) translateX(-50%);
+        }
+        60% {
+            transform: translateY(-10px) translateX(-50%);
+        }
+    }
+    
+    .reveal {
+        opacity: 0;
+        transform: translateY(50px);
+        transition: all 1s ease;
+    }
+    
+    .reveal.active {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    
+    .feature-section {
+        min-height: 60vh;
+        padding: 80px 20px;
         text-align: center;
-        animation: fadeIn 1s ease-in;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        border-radius: 20px;
+        margin: 20px 0;
     }
     
-    .slogan-title {
-        font-size: 1.8rem;
+    .feature-title {
+        font-size: 2.5rem;
         font-weight: bold;
-        margin-bottom: 15px;
-        color: #333;
+        margin-bottom: 20px;
+        color: white;
+        text-shadow: 2px 2px 8px rgba(0,0,0,0.3);
     }
     
-    .slogan-text {
-        font-size: 1.2rem;
-        color: #555;
-        font-style: italic;
+    .feature-text {
+        font-size: 1.3rem;
+        color: #e0e0e0;
         line-height: 1.6;
+        max-width: 600px;
     }
     
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
+    .section-1 {
+        background: linear-gradient(180deg, #16213e 0%, #0f3460 100%);
     }
     
-    .gradient-bg {
-        background: linear-gradient(180deg, 
-            #1a1a2e 0%, 
-            #16213e 20%, 
-            #0f3460 40%, 
-            #533483 60%, 
-            #e94560 80%, 
-            #ffffff 100%);
-        min-height: 100vh;
-        padding: 20px;
-        border-radius: 10px;
+    .section-2 {
+        background: linear-gradient(180deg, #0f3460 0%, #533483 100%);
     }
+    
+    .section-3 {
+        background: linear-gradient(180deg, #533483 0%, #e94560 100%);
+    }
+    
+    .section-4 {
+        background: linear-gradient(180deg, #e94560 0%, #ff6b6b 100%);
+    }
+    
+    .section-5 {
+        background: linear-gradient(180deg, #ff6b6b 0%, #ffa502 100%);
+    }
+    
+    .section-6 {
+        background: linear-gradient(180deg, #ffa502 0%, #f9ca24 100%);
+    }
+    
+    .section-7 {
+        background: linear-gradient(180deg, #f9ca24 0%, #a4de02 100%);
+    }
+    
+    .section-8 {
+        background: linear-gradient(180deg, #a4de02 0%, #ffffff 100%);
+    }
+    
+    .section-8 .feature-title {
+        color: #333;
+        text-shadow: none;
+    }
+    
+    .section-8 .feature-text {
+        color: #555;
+    }
+    
     </style>
     """, unsafe_allow_html=True)
 
-    # Ana container
-    st.markdown('<div class="gradient-bg">', unsafe_allow_html=True)
+    # JavaScript ile scroll animasyonu
+    components.html("""
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('active');
+                }
+            });
+        }, {
+            threshold: 0.3
+        });
+        
+        document.querySelectorAll('.reveal').forEach(el => {
+            observer.observe(el);
+        });
+        
+        window.addEventListener('scroll', function() {
+            const indicator = document.querySelector('.scroll-indicator');
+            if (indicator) {
+                if (window.scrollY > 100) {
+                    indicator.style.opacity = '0';
+                } else {
+                    indicator.style.opacity = '0.7';
+                }
+            }
+        });
+    });
+    </script>
+    """, height=0, width=0)
 
     # Üst menü
     col_logo, col_space, col_login, col_register = st.columns([3, 4, 1.5, 1.5])
@@ -555,8 +665,6 @@ if not st.session_state.user:
         if st.button("📝 Üye Ol", type="primary", use_container_width=True):
             st.session_state.show_auth_modal = True
             st.rerun()
-
-    st.divider()
 
     # Giriş modal'ı
     if st.session_state.show_auth_modal:
@@ -680,75 +788,74 @@ if not st.session_state.user:
                 st.session_state.show_auth_modal = False
                 st.rerun()
 
-    # Ana başlık
+    # Hero bölümü
     st.markdown("""
-    <div class="main-header">
-        <h1 class="main-title">Ekrandan Çık, Hayata Gir 🚀</h1>
-        <p class="main-subtitle">Bağımlılıklarından kurtul, gerçek potansiyelini keşfet</p>
+    <div class="hero-section">
+        <h1 class="hero-title">Ekrandan Çık, Hayata Gir 🚀</h1>
+        <p class="hero-subtitle">Bağımlılıklarından kurtul, gerçek potansiyelini keşfet</p>
+        <div class="scroll-indicator">⌄</div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Sloganlar bölümü
-    st.markdown("---")
-    
-    slogans = [
+    # Feature bölümleri
+    sections = [
         {
             "title": "💪 Güçlü Bir Sen",
-            "text": "Her gün bir adım at, bağımlılıklarının esiri olma. Sen kontrol sende!"
+            "text": "Her gün bir adım at, bağımlılıklarının esiri olma. Sen kontrol sende!",
+            "class": "section-1"
         },
         {
             "title": "🎯 Hedefine Odaklan",
-            "text": "Ekran başında geçen her saat, hayallerinden çalınan bir saattir."
+            "text": "Ekran başında geçen her saat, hayallerinden çalınan bir saattir.",
+            "class": "section-2"
         },
         {
             "title": "🌅 Yeni Bir Başlangıç",
-            "text": "Bugün bırak, yarın özgür ol. Bağımlılık zincirlerini kır!"
+            "text": "Bugün bırak, yarın özgür ol. Bağımlılık zincirlerini kır!",
+            "class": "section-3"
         },
         {
             "title": "🧠 Zihnini Özgürleştir",
-            "text": "Teknoloji sana hizmet etsin, sen teknolojiye değil."
+            "text": "Teknoloji sana hizmet etsin, sen teknolojiye değil.",
+            "class": "section-4"
         },
         {
             "title": "❤️ Gerçek Bağlantılar",
-            "text": "Sanal dünyada kaybolma, gerçek ilişkiler kur."
+            "text": "Sanal dünyada kaybolma, gerçek ilişkiler kur.",
+            "class": "section-5"
         },
         {
             "title": "🌟 Parlak Gelecek",
-            "text": "Her bağımlılıktan kurtuluş, yeni bir hayatın başlangıcıdır."
+            "text": "Her bağımlılıktan kurtuluş, yeni bir hayatın başlangıcıdır.",
+            "class": "section-6"
         },
         {
             "title": "🏃‍♂️ Harekete Geç",
-            "text": "Düşünme, yap! Alışkanlıklarını değiştir, hayatın değişsin."
+            "text": "Düşünme, yap! Alışkanlıklarını değiştir, hayatın değişsin.",
+            "class": "section-7"
         },
         {
             "title": "🔓 Özgürlüğe Giden Yol",
-            "text": "Bağımlılık bir kafestir. Anahtar senin elinde."
+            "text": "Bağımlılık bir kafestir. Anahtar senin elinde.",
+            "class": "section-8"
         }
     ]
 
-    for i, slogan in enumerate(slogans):
-        colors = ["#f0f8ff", "#f5f5f5", "#e8f5e9", "#fff3e0", "#fce4ec", "#e0f7fa", "#f1f8e9", "#ede7f6"]
-        bg_color = colors[i % len(colors)]
-        
+    for section in sections:
         st.markdown(f"""
-        <div class="slogan-section" style="background-color: {bg_color};">
-            <div class="slogan-title">{slogan['title']}</div>
-            <div class="slogan-text">"{slogan['text']}"</div>
+        <div class="feature-section {section['class']} reveal">
+            <div class="feature-title">{section['title']}</div>
+            <div class="feature-text">"{section['text']}"</div>
         </div>
         """, unsafe_allow_html=True)
-        
-        st.markdown("")
 
     # Alt bilgi
-    st.markdown("---")
     st.markdown("""
-    <div style="text-align: center; padding: 20px; color: #666;">
-        <p>🌱 Her gün yeni bir başlangıçtır. Şimdi başla!</p>
-        <p style="font-size: 0.9rem;">Karakter & Alışkanlık Koçu ile hayatını dönüştür</p>
+    <div style="text-align: center; padding: 60px 20px; background: white; color: #333;">
+        <h2 style="font-size: 2rem; margin-bottom: 20px;">🌱 Her gün yeni bir başlangıçtır</h2>
+        <p style="font-size: 1.2rem;">Şimdi başla! Karakter & Alışkanlık Koçu ile hayatını dönüştür</p>
     </div>
     """, unsafe_allow_html=True)
-
-    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ============================================================
