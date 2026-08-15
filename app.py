@@ -511,13 +511,7 @@ if not st.session_state.user:
         border-radius: 15px;
         text-align: center;
         opacity: 0;
-        transform: translateY(40px);
-        transition: opacity 0.8s ease-out, transform 0.8s ease-out;
-    }
-    
-    .slogan-card.visible {
-        opacity: 1;
-        transform: translateY(0);
+        animation: fadeInUp 0.7s ease-out forwards;
     }
     
     .slogan-card h2 {
@@ -530,6 +524,17 @@ if not st.session_state.user:
         font-size: 1.2rem;
         line-height: 1.6;
         font-style: italic;
+    }
+    
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(40px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
     
     .color-1 { background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%); }
@@ -557,42 +562,6 @@ if not st.session_state.user:
     .color-8 h2, .color-8 p { color: #333; }
     </style>
     """, unsafe_allow_html=True)
-
-    # JavaScript: doğru scroll container'ı dinle
-    components.html("""
-    <script>
-    (function() {
-        function isElementInViewport(el) {
-            var rect = el.getBoundingClientRect();
-            var windowHeight = window.innerHeight || document.documentElement.clientHeight;
-            return rect.top <= windowHeight * 0.85 && rect.bottom >= 0;
-        }
-        
-        function handleScroll() {
-            var cards = document.querySelectorAll('.slogan-card');
-            cards.forEach(function(card) {
-                if (!card.classList.contains('visible') && isElementInViewport(card)) {
-                    card.classList.add('visible');
-                }
-            });
-        }
-        
-        // Streamlit ana kapsayıcısını bul
-        var mainContainer = document.querySelector('[data-testid="stAppViewContainer"]') || document;
-        
-        // Scroll olaylarını dinle
-        mainContainer.addEventListener('scroll', handleScroll);
-        window.addEventListener('scroll', handleScroll);
-        document.addEventListener('scroll', handleScroll);
-        
-        // İlk yükleme ve gecikmeli kontroller
-        handleScroll();
-        setTimeout(handleScroll, 500);
-        setTimeout(handleScroll, 1000);
-        setTimeout(handleScroll, 2000);
-    })();
-    </script>
-    """, height=0, width=0)
 
     # Üst menü
     col_logo, col_space, col_login, col_register = st.columns([3, 4, 1.5, 1.5])
@@ -745,48 +714,56 @@ if not st.session_state.user:
         {
             "title": "💪 Güçlü Bir Sen",
             "text": "Her gün bir adım at, bağımlılıklarının esiri olma. Sen kontrol sende!",
-            "color": "color-1"
+            "color": "color-1",
+            "delay": "0.2s"
         },
         {
             "title": "🎯 Hedefine Odaklan",
             "text": "Ekran başında geçen her saat, hayallerinden çalınan bir saattir.",
-            "color": "color-2"
+            "color": "color-2",
+            "delay": "0.5s"
         },
         {
             "title": "🌅 Yeni Bir Başlangıç",
             "text": "Bugün bırak, yarın özgür ol. Bağımlılık zincirlerini kır!",
-            "color": "color-3"
+            "color": "color-3",
+            "delay": "0.8s"
         },
         {
             "title": "🧠 Zihnini Özgürleştir",
             "text": "Teknoloji sana hizmet etsin, sen teknolojiye değil.",
-            "color": "color-4"
+            "color": "color-4",
+            "delay": "1.1s"
         },
         {
             "title": "❤️ Gerçek Bağlantılar",
             "text": "Sanal dünyada kaybolma, gerçek ilişkiler kur.",
-            "color": "color-5"
+            "color": "color-5",
+            "delay": "1.4s"
         },
         {
             "title": "🌟 Parlak Gelecek",
             "text": "Her bağımlılıktan kurtuluş, yeni bir hayatın başlangıcıdır.",
-            "color": "color-6"
+            "color": "color-6",
+            "delay": "1.7s"
         },
         {
             "title": "🏃‍♂️ Harekete Geç",
             "text": "Düşünme, yap! Alışkanlıklarını değiştir, hayatın değişsin.",
-            "color": "color-7"
+            "color": "color-7",
+            "delay": "2.0s"
         },
         {
             "title": "🔓 Özgürlüğe Giden Yol",
             "text": "Bağımlılık bir kafestir. Anahtar senin elinde.",
-            "color": "color-8"
+            "color": "color-8",
+            "delay": "2.3s"
         }
     ]
 
     for slogan in slogans:
         st.markdown(f"""
-        <div class="slogan-card {slogan['color']}">
+        <div class="slogan-card {slogan['color']}" style="animation-delay: {slogan['delay']};">
             <h2>{slogan['title']}</h2>
             <p>"{slogan['text']}"</p>
         </div>
