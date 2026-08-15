@@ -1,4 +1,3 @@
-```python
 import streamlit as st
 from supabase import create_client, Client
 from groq import Groq
