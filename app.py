@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 from supabase import create_client, Client
 from groq import Groq
 import uuid
@@ -9,19 +10,36 @@ st.set_page_config(
     page_title="Alışkanlık Asistanı",
     page_icon="🌱",
     layout="wide",
-    initial_sidebar_state="expanded"   # her zaman açık başlasın
+    initial_sidebar_state="collapsed"   # kapalı başlasın
 )
 
-# CSS (sadece gereksiz şeyleri gizle)
+# CSS
 st.markdown("""
     <style>
     footer {visibility: hidden;}
     header {visibility: hidden;}
+    
+    /* Streamlit'in kendi okunu gizle */
+    [data-testid="stSidebarNav"] {display: none !important;}
+    [data-testid="collapsedControl"] {display: none !important;}
+    button[data-testid="stSidebarCollapsedControl"] {display: none !important;}
+    
     .stButton>button { width: 100%; }
+    
+    /* Yeşil Menü butonu */
+    div[data-testid="stColumn"] button[key="btn_toggle_sidebar"] {
+        background-color: #2e7d32 !important;
+        color: #ffffff !important;
+        font-weight: bold !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 8px 16px !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. SUPABASE CLIENT (CACHE YOK!) ---
+# --- 2. SUPABASE CLIENT (CACHE YOK) ---
 def get_supabase_client() -> Client | None:
     try:
         url = st.secrets.get("SUPABASE_URL", "").strip().rstrip("/")
@@ -34,7 +52,7 @@ def get_supabase_client() -> Client | None:
 
 supabase = get_supabase_client()
 
-# --- 3. SESSION STATE BAŞLATMA ---
+# --- 3. SESSION STATE ---
 if "user" not in st.session_state:
     st.session_state.user = None
 if "chats" not in st.session_state:
@@ -75,7 +93,7 @@ if not st.session_state.user:
         _, auth_col, _ = st.columns([1, 2, 1])
         with auth_col:
             if not supabase:
-                st.error("Veri tabanı bağlantısı kurulamadı. Secrets kontrol et.")
+                st.error("Veri tabanı bağlantısı kurulamadı.")
             else:
                 tab_login, tab_register = st.tabs(["🔑 Giriş Yap", "📝 Kayıt Ol"])
                 
@@ -92,7 +110,6 @@ if not st.session_state.user:
                                     "email": email.strip().lower(),
                                     "password": password
                                 })
-                                # Session state'i temizle ve yeni kullanıcıyı yükle
                                 st.session_state.clear()
                                 st.session_state.user = res.user
                                 meta = res.user.user_metadata or {}
@@ -105,7 +122,7 @@ if not st.session_state.user:
                                 st.session_state.show_auth_modal = False
                                 st.rerun()
                             except Exception:
-                                st.error("Giriş Başarısız: E-posta veya şifre hatalı.")
+                                st.error("Giriş Başarısız: Bilgilerinizi kontrol edin.")
 
                 with tab_register:
                     reg_name = st.text_input("Ad Soyad", key="r_name")
@@ -137,11 +154,11 @@ if not st.session_state.user:
                                         }
                                     }
                                 })
-                                st.success("Kayıt başarılı! Şimdi giriş yapabilirsiniz.")
+                                st.success("Kayıt başarılı! Giriş yapabilirsiniz.")
                                 st.session_state.show_auth_modal = "login"
                                 st.rerun()
                             except Exception as err:
-                                st.error(f"Kayıt hatası: {err}")
+                                st.error(f"Hata: {err}")
 
             if st.button("✖ Kapat"):
                 st.session_state.show_auth_modal = False
@@ -149,12 +166,39 @@ if not st.session_state.user:
 
         st.divider()
 
-    st.markdown("<h1 style='text-align: center;'>Ekrandan çıkışını değil, gerçek hayata girişini keşfet 🚀</h1>", unsafe_allow_html=True)
+    # === ANA EKRAN SLOGANLARI (geri koyuldu) ===
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; font-size: 2.4rem;'>Ekrandan çıkışını değil,<br>gerçek hayata girişini keşfet 🚀</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; font-size: 1.2rem; color: #555;'>Alışkanlıklarını dönüştür, karakterini güçlendir.</p>", unsafe_allow_html=True)
 
 # --- 5. GİRİŞ YAPILMIŞSA ---
 else:
     user_email = st.session_state.user.email
     display_name = st.session_state.get("profile_name", user_email.split('@')[0])
+
+    # === MENÜ BUTONU ===
+    col_menu_btn, _ = st.columns([1.4, 6])
+    with col_menu_btn:
+        if st.button("☰ Menü", key="btn_toggle_sidebar"):
+            components.html("""
+                <script>
+                    const sidebar = window.parent.document.querySelector('section[data-testid="stSidebar"]');
+                    if (sidebar) {
+                        const isOpen = sidebar.offsetWidth > 50;
+                        if (isOpen) {
+                            sidebar.style.width = "0px";
+                            sidebar.style.minWidth = "0px";
+                            sidebar.style.transform = "translateX(-100%)";
+                            sidebar.setAttribute('aria-expanded', 'false');
+                        } else {
+                            sidebar.style.width = "21rem";
+                            sidebar.style.minWidth = "21rem";
+                            sidebar.style.transform = "none";
+                            sidebar.setAttribute('aria-expanded', 'true');
+                        }
+                    }
+                </script>
+            """, height=0, width=0)
 
     # --- SIDEBAR ---
     with st.sidebar:
@@ -202,7 +246,7 @@ else:
 
         GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
         if not GROQ_API_KEY:
-            st.error("GROQ_API_KEY bulunamadı. Secrets dosyasını kontrol et.")
+            st.error("GROQ_API_KEY bulunamadı.")
         else:
             client = Groq(api_key=GROQ_API_KEY)
 
