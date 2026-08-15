@@ -151,7 +151,7 @@ if not st.session_state.user:
                             except Exception as err:
                                 st.error("Giriş Başarısız: E-posta/şifre hatalı veya hesabınız henüz doğrulanmamış.")
 
-                # KAYIT OL (E-POSTA DOĞRULAMA UYARISI İLE)
+                # KAYIT OL
                 with tab_register:
                     reg_name = st.text_input("Ad Soyad", key="r_name")
                     reg_email = st.text_input("E-Posta Adresi", key="r_email")
@@ -197,8 +197,18 @@ if not st.session_state.user:
                 st.rerun()
         st.divider()
 
-    st.markdown("<h1 style='text-align: center;'>Kötü Alışkanlıklarından Kurtul, Hayatını Yeniden İnşa Et 🚀</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; font-size: 18px;'>Yapay zeka destekli kişisel koçun ile her gün geliş, hedeflerine ulaş ve motivasyonunu en üst seviyede tut.</p>", unsafe_allow_html=True)
+    # --- YENİ SLOGANLAR (GİRİŞ EKRANI) ---
+    st.markdown("<h1 style='text-align: center;'>Ekrandan çıkışını değil, gerçek hayata girişini keşfet 🚀</h1>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center; color: #2e7d32;'>Kaçmak değil, yeniden bağlanmak</h3>", unsafe_allow_html=True)
+    st.write("")
+    
+    st.markdown("""
+        <div style='text-align: center; font-size: 18px; line-height: 2;'>
+            ✨ <i>Sıkıldığında ekrana değil, hayata dokun.</i><br>
+            💡 <i>Ne yapacağını bilemediğin anlar için, sana özel bir öneri.</i><br>
+            🎯 <b>Sıkıldın mı? RE:LIVE bulur!</b>
+        </div>
+    """, unsafe_allow_html=True)
 
 # --- 5. GİRİŞ YAPILMIŞSA ---
 else:
