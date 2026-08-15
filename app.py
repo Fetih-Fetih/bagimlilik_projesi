@@ -6,7 +6,7 @@ from datetime import datetime, date
 
 
 # ============================================================
-# SAYFA AYARLARI
+# 1. SAYFA AYARLARI
 # ============================================================
 
 st.set_page_config(
@@ -18,15 +18,29 @@ st.set_page_config(
 
 
 # ============================================================
-# CSS
+# 2. CSS
 # ============================================================
 
 st.markdown("""
 <style>
-footer { visibility: hidden; }
-header { visibility: hidden; }
+
+footer {
+    visibility: hidden;
+}
+
+header {
+    visibility: hidden;
+}
 
 [data-testid="stSidebarNav"] {
+    display: none !important;
+}
+
+[data-testid="collapsedControl"] {
+    display: none !important;
+}
+
+button[data-testid="stSidebarCollapsedControl"] {
     display: none !important;
 }
 
@@ -34,24 +48,51 @@ header { visibility: hidden; }
     width: 100%;
     border-radius: 8px;
 }
+
+div[data-testid="stColumn"] button[key="btn_menu"] {
+    background-color: #2e7d32 !important;
+    color: white !important;
+    font-weight: bold !important;
+    border: none !important;
+    border-radius: 8px !important;
+}
+
+.profile-photo {
+    border-radius: 50%;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
 
 # ============================================================
-# SUPABASE
+# 3. SUPABASE
 # ============================================================
 
 def get_supabase_client() -> Client | None:
+
     try:
-        url = st.secrets.get("SUPABASE_URL", "").strip().rstrip("/")
-        key = st.secrets.get("SUPABASE_KEY", "").strip()
+
+        url = st.secrets.get(
+            "SUPABASE_URL",
+            ""
+        ).strip().rstrip("/")
+
+        key = st.secrets.get(
+            "SUPABASE_KEY",
+            ""
+        ).strip()
 
         if not url or not key:
             return None
 
-        return create_client(url, key)
+        return create_client(
+            url,
+            key
+        )
+
     except Exception:
+
         return None
 
 
@@ -59,32 +100,51 @@ supabase = get_supabase_client()
 
 
 # ============================================================
-# SESSION STATE
+# 4. SESSION STATE
 # ============================================================
 
-defaults = {
-    "user": None,
-    "access_token": None,
-    "refresh_token": None,
-    "chats": {},
-    "current_chat_id": None,
-    "show_auth_modal": False,
-    "gun_sayisi": 1,
-    "sayfa": "🌱 AI Koç & Sohbet",
-    "profile_name": "",
-    "birth_date": "2000-01-01",
-    "gender": "Belirtilmedi",
-    "avatar_url": "",
-    "profile_saved": False,
-}
+if "user" not in st.session_state:
+    st.session_state.user = None
 
-for key, value in defaults.items():
-    if key not in st.session_state:
-        st.session_state[key] = value
+if "access_token" not in st.session_state:
+    st.session_state.access_token = None
+
+if "refresh_token" not in st.session_state:
+    st.session_state.refresh_token = None
+
+if "chats" not in st.session_state:
+    st.session_state.chats = {}
+
+if "current_chat_id" not in st.session_state:
+    st.session_state.current_chat_id = None
+
+if "show_auth_modal" not in st.session_state:
+    st.session_state.show_auth_modal = False
+
+if "gun_sayisi" not in st.session_state:
+    st.session_state.gun_sayisi = 1
+
+if "sayfa" not in st.session_state:
+    st.session_state.sayfa = "🌱 AI Koç & Sohbet"
+
+if "profile_name" not in st.session_state:
+    st.session_state.profile_name = ""
+
+if "birth_date" not in st.session_state:
+    st.session_state.birth_date = "2000-01-01"
+
+if "gender" not in st.session_state:
+    st.session_state.gender = "Belirtilmedi"
+
+if "avatar_url" not in st.session_state:
+    st.session_state.avatar_url = ""
+
+if "profile_saved" not in st.session_state:
+    st.session_state.profile_saved = False
 
 
 # ============================================================
-# GİRİŞ YAPILMAMIŞSA
+# 5. GİRİŞ YAPILMAMIŞSA
 # ============================================================
 
 if not st.session_state.user:
@@ -94,38 +154,67 @@ if not st.session_state.user:
     )
 
     with col_logo:
-        st.markdown("### 🌱 **Karakter & Alışkanlık Koçu**")
+
+        st.markdown(
+            "### 🌱 **Karakter & Alışkanlık Koçu**"
+        )
 
     with col_login:
-        if st.button("🔑 Giriş Yap", use_container_width=True):
+
+        if st.button(
+            "🔑 Giriş Yap",
+            use_container_width=True
+        ):
+
             st.session_state.show_auth_modal = "login"
             st.rerun()
 
     with col_register:
-        if st.button("📝 Üye Ol", type="primary", use_container_width=True):
+
+        if st.button(
+            "📝 Üye Ol",
+            type="primary",
+            use_container_width=True
+        ):
+
             st.session_state.show_auth_modal = "register"
             st.rerun()
 
+
     st.divider()
+
+
+    # ========================================================
+    # GİRİŞ / KAYIT
+    # ========================================================
 
     if st.session_state.show_auth_modal:
 
-        _, auth_col, _ = st.columns([1, 2, 1])
+        _, auth_col, _ = st.columns(
+            [1, 2, 1]
+        )
 
         with auth_col:
 
             if not supabase:
-                st.error("Veri tabanı bağlantısı kurulamadı.")
+
+                st.error(
+                    "Veri tabanı bağlantısı kurulamadı."
+                )
 
             else:
 
                 tab_login, tab_register = st.tabs(
-                    ["🔑 Giriş Yap", "📝 Kayıt Ol"]
+                    [
+                        "🔑 Giriş Yap",
+                        "📝 Kayıt Ol"
+                    ]
                 )
 
-                # ------------------------------------------------
+
+                # =================================================
                 # GİRİŞ
-                # ------------------------------------------------
+                # =================================================
 
                 with tab_login:
 
@@ -140,6 +229,7 @@ if not st.session_state.user:
                         key="l_pass"
                     )
 
+
                     if st.button(
                         "Giriş Yap",
                         type="primary",
@@ -148,74 +238,141 @@ if not st.session_state.user:
                     ):
 
                         if not email or not password:
-                            st.warning("Lütfen tüm alanları doldurun.")
+
+                            st.warning(
+                                "Lütfen tüm alanları doldurun."
+                            )
 
                         else:
 
                             try:
 
-                                res = supabase.auth.sign_in_with_password(
-                                    {
-                                        "email": email.strip().lower(),
-                                        "password": password
-                                    }
+                                res = (
+                                    supabase.auth
+                                    .sign_in_with_password(
+                                        {
+                                            "email": email.strip().lower(),
+                                            "password": password
+                                        }
+                                    )
                                 )
 
-                                # Session bilgilerini clear'dan önce al
+
+                                # ---------------------------------
+                                # ÖNCE TOKENLARI AL
+                                # ---------------------------------
+
                                 access_token = None
                                 refresh_token = None
 
                                 if res.session:
-                                    access_token = res.session.access_token
-                                    refresh_token = res.session.refresh_token
 
-                                meta = res.user.user_metadata or {}
+                                    access_token = (
+                                        res.session.access_token
+                                    )
 
-                                # Eski state'i temizle
+                                    refresh_token = (
+                                        res.session.refresh_token
+                                    )
+
+
+                                # ---------------------------------
+                                # STATE TEMİZLE
+                                # ---------------------------------
+
                                 st.session_state.clear()
 
-                                # Kullanıcı ve session
+
+                                # ---------------------------------
+                                # TOKENLARI GERİ YAZ
+                                # ---------------------------------
+
                                 st.session_state.user = res.user
-                                st.session_state.access_token = access_token
-                                st.session_state.refresh_token = refresh_token
 
-                                # Profil
-                                st.session_state.profile_name = meta.get(
-                                    "full_name",
-                                    email.split("@")[0]
+                                st.session_state.access_token = (
+                                    access_token
                                 )
 
-                                st.session_state.birth_date = meta.get(
-                                    "birth_date",
-                                    "2000-01-01"
+                                st.session_state.refresh_token = (
+                                    refresh_token
                                 )
 
-                                st.session_state.gender = meta.get(
-                                    "gender",
-                                    "Belirtilmedi"
+
+                                # ---------------------------------
+                                # PROFİL BİLGİLERİ
+                                # ---------------------------------
+
+                                meta = (
+                                    res.user.user_metadata
+                                    or {}
                                 )
 
-                                st.session_state.avatar_url = meta.get(
-                                    "avatar_url",
-                                    ""
+
+                                st.session_state.profile_name = (
+                                    meta.get(
+                                        "full_name",
+                                        email.split("@")[0]
+                                    )
                                 )
 
-                                # Diğer state
+
+                                st.session_state.birth_date = (
+                                    meta.get(
+                                        "birth_date",
+                                        "2000-01-01"
+                                    )
+                                )
+
+
+                                st.session_state.gender = (
+                                    meta.get(
+                                        "gender",
+                                        "Belirtilmedi"
+                                    )
+                                )
+
+
+                                st.session_state.avatar_url = (
+                                    meta.get(
+                                        "avatar_url",
+                                        ""
+                                    )
+                                )
+
+
+                                # ---------------------------------
+                                # DİĞER STATE'LER
+                                # ---------------------------------
+
                                 st.session_state.chats = {}
+
                                 st.session_state.current_chat_id = None
+
                                 st.session_state.gun_sayisi = 1
-                                st.session_state.sayfa = "🌱 AI Koç & Sohbet"
+
+                                st.session_state.sayfa = (
+                                    "🌱 AI Koç & Sohbet"
+                                )
+
                                 st.session_state.show_auth_modal = False
+
                                 st.session_state.profile_saved = False
+
 
                                 st.rerun()
 
-                            except Exception as e:
-                                st.error(f"Giriş başarısız: {e}")
 
-                # ------------------------------------------------
+                            except Exception:
+
+                                st.error(
+                                    "Giriş Başarısız: "
+                                    "Bilgilerinizi kontrol edin."
+                                )
+
+
+                # =================================================
                 # KAYIT
-                # ------------------------------------------------
+                # =================================================
 
                 with tab_register:
 
@@ -241,16 +398,25 @@ if not st.session_state.user:
                         key="r_conf"
                     )
 
+
                     col_bdate, col_gnd = st.columns(2)
 
+
                     with col_bdate:
+
                         reg_bdate = st.date_input(
                             "Doğum Tarihi",
-                            value=date(2000, 1, 1),
+                            value=date(
+                                2000,
+                                1,
+                                1
+                            ),
                             key="r_bdate"
                         )
 
+
                     with col_gnd:
+
                         reg_gender = st.selectbox(
                             "Cinsiyet",
                             [
@@ -261,6 +427,7 @@ if not st.session_state.user:
                             key="r_gnd"
                         )
 
+
                     if st.button(
                         "Kayıt Ol",
                         key="btn_r",
@@ -269,10 +436,20 @@ if not st.session_state.user:
                     ):
 
                         if reg_pass != reg_pass_conf:
-                            st.error("Şifreler eşleşmiyor!")
 
-                        elif not reg_name or not reg_email or not reg_pass:
-                            st.warning("Lütfen tüm alanları doldurun.")
+                            st.error(
+                                "Şifreler eşleşmiyor!"
+                            )
+
+                        elif (
+                            not reg_name
+                            or not reg_email
+                            or not reg_pass
+                        ):
+
+                            st.warning(
+                                "Lütfen tüm alanları doldurun."
+                            )
 
                         else:
 
@@ -280,42 +457,71 @@ if not st.session_state.user:
 
                                 supabase.auth.sign_up(
                                     {
-                                        "email": reg_email.strip().lower(),
+                                        "email": (
+                                            reg_email
+                                            .strip()
+                                            .lower()
+                                        ),
                                         "password": reg_pass,
                                         "options": {
                                             "data": {
-                                                "full_name": reg_name.strip(),
-                                                "birth_date": str(reg_bdate),
-                                                "gender": reg_gender,
-                                                "avatar_url": ""
+                                                "full_name": (
+                                                    reg_name.strip()
+                                                ),
+                                                "birth_date": (
+                                                    str(reg_bdate)
+                                                ),
+                                                "gender": (
+                                                    reg_gender
+                                                )
                                             }
                                         }
                                     }
                                 )
 
+
                                 st.success(
-                                    "Kayıt başarılı! Giriş yapabilirsiniz."
+                                    "Kayıt başarılı! "
+                                    "Giriş yapabilirsiniz."
                                 )
 
-                                st.session_state.show_auth_modal = "login"
+
+                                st.session_state.show_auth_modal = (
+                                    "login"
+                                )
+
                                 st.rerun()
 
-                            except Exception as e:
-                                st.error(f"Kayıt hatası: {e}")
 
-            if st.button("✖ Kapat", use_container_width=True):
+                            except Exception as err:
+
+                                st.error(
+                                    f"Hata: {err}"
+                                )
+
+
+            if st.button(
+                "✖ Kapat",
+                use_container_width=True
+            ):
+
                 st.session_state.show_auth_modal = False
+
                 st.rerun()
 
-    # ----------------------------------------------------------
-    # ANA EKRAN
-    # ----------------------------------------------------------
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    # ========================================================
+    # ANA EKRAN
+    # ========================================================
+
+    st.markdown(
+        "<br>",
+        unsafe_allow_html=True
+    )
 
     st.markdown(
         """
-        <h1 style='text-align:center; font-size:2.4rem;'>
+        <h1 style='text-align: center; font-size: 2.4rem;'>
         Ekrandan çıkışını değil,<br>
         gerçek hayata girişini keşfet 🚀
         </h1>
@@ -325,7 +531,7 @@ if not st.session_state.user:
 
     st.markdown(
         """
-        <p style='text-align:center; font-size:1.2rem; color:#555;'>
+        <p style='text-align: center; font-size: 1.2rem; color: #555;'>
         Alışkanlıklarını dönüştür, karakterini güçlendir.
         </p>
         """,
@@ -334,7 +540,7 @@ if not st.session_state.user:
 
 
 # ============================================================
-# GİRİŞ YAPILMIŞSA
+# 6. GİRİŞ YAPILMIŞSA
 # ============================================================
 
 else:
@@ -346,46 +552,79 @@ else:
         user_email.split("@")[0]
     )
 
-    # ----------------------------------------------------------
-    # ÜST MENÜ
-    # ----------------------------------------------------------
 
-    col_menu_btn, _ = st.columns([1.4, 6])
+    # ========================================================
+    # ÜST MENÜ
+    # ========================================================
+
+    col_menu_btn, _ = st.columns(
+        [1.4, 6]
+    )
 
     with col_menu_btn:
-        st.button("☰ Menü", key="btn_menu")
 
-    # ----------------------------------------------------------
+        st.button(
+            "☰ Menü",
+            key="btn_menu"
+        )
+
+
+    # ========================================================
     # SIDEBAR
-    # ----------------------------------------------------------
+    # ========================================================
 
     with st.sidebar:
 
-        st.title("📌 Menü")
+        st.title(
+            "📌 Menü"
+        )
 
-        avatar_url = st.session_state.get("avatar_url", "")
+        # Profil fotoğrafı
+        if st.session_state.avatar_url:
 
-        if avatar_url:
             try:
-                st.image(avatar_url, width=100)
-            except Exception:
-                st.markdown("## 👤")
-        else:
-            st.markdown("## 👤")
 
-        st.write(f"**{display_name}**")
-        st.caption(user_email)
+                st.image(
+                    st.session_state.avatar_url,
+                    width=100
+                )
+
+            except Exception:
+
+                st.write("👤")
+
+        else:
+
+            st.markdown(
+                "## 👤"
+            )
+
+
+        st.write(
+            f"**{display_name}**"
+        )
+
+        st.caption(
+            user_email
+        )
 
         st.divider()
+
 
         if st.button(
             "⚙️ Profilimi Düzenle",
             use_container_width=True
         ):
-            st.session_state.sayfa = "👤 Profilim"
+
+            st.session_state.sayfa = (
+                "👤 Profilim"
+            )
+
             st.rerun()
 
+
         st.divider()
+
 
         sayfalar = [
             "🌱 AI Koç & Sohbet",
@@ -394,18 +633,26 @@ else:
             "👤 Profilim"
         ]
 
+
         secilen_sayfa = st.radio(
             "Sayfalar",
             sayfalar,
-            index=sayfalar.index(st.session_state.sayfa),
+            index=sayfalar.index(
+                st.session_state.sayfa
+            ),
             key="nav_radio"
         )
 
+
         if secilen_sayfa != st.session_state.sayfa:
+
             st.session_state.sayfa = secilen_sayfa
+
             st.rerun()
 
+
         st.divider()
+
 
         if st.button(
             "🚪 Çıkış Yap",
@@ -414,87 +661,153 @@ else:
         ):
 
             if supabase:
+
                 try:
+
                     supabase.auth.sign_out()
+
                 except Exception:
+
                     pass
 
+
             st.session_state.clear()
+
             st.rerun()
 
+
     # ========================================================
-    # AI KOÇ & SOHBET
+    # 7. AI KOÇ & SOHBET
     # ========================================================
 
     if st.session_state.sayfa == "🌱 AI Koç & Sohbet":
 
-        col_title, col_new_btn = st.columns([4, 1.2])
+        col_title, col_new_btn = st.columns(
+            [4, 1.2]
+        )
+
 
         with col_title:
-            st.title("🌱 Alışkanlık & Motivasyon Asistanı")
+
+            st.title(
+                "🌱 Alışkanlık & Motivasyon Asistanı"
+            )
+
 
         with col_new_btn:
 
             if st.button(
-                "➕ Yeni Sohbet",
-                use_container_width=True
+                "➕ Yeni Sohbet"
             ):
+
                 st.session_state.current_chat_id = None
+
                 st.rerun()
+
 
         st.caption(
             f"Hoş geldin **{display_name}**! "
-            f"Bugün **{st.session_state.gun_sayisi}.** günündesin."
+            f"Bugün **{st.session_state.gun_sayisi}.** "
+            "günündesin."
         )
 
-        GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "").strip()
+
+        GROQ_API_KEY = st.secrets.get(
+            "GROQ_API_KEY",
+            ""
+        )
+
 
         if not GROQ_API_KEY:
 
-            st.error("GROQ_API_KEY bulunamadı.")
+            st.error(
+                "GROQ_API_KEY bulunamadı."
+            )
 
         else:
 
-            client = Groq(api_key=GROQ_API_KEY)
+            client = Groq(
+                api_key=GROQ_API_KEY
+            )
+
 
             current_messages = []
 
+
             if (
                 st.session_state.current_chat_id
-                and st.session_state.current_chat_id in st.session_state.chats
+                and
+                st.session_state.current_chat_id
+                in st.session_state.chats
             ):
-                current_messages = st.session_state.chats[
-                    st.session_state.current_chat_id
-                ]["messages"]
+
+                current_messages = (
+                    st.session_state
+                    .chats[
+                        st.session_state.current_chat_id
+                    ]["messages"]
+                )
+
 
             for message in current_messages:
-                with st.chat_message(message["role"]):
-                    st.markdown(message["content"])
 
-            prompt = st.chat_input("Mesajınızı yazın...")
+                with st.chat_message(
+                    message["role"]
+                ):
+
+                    st.markdown(
+                        message["content"]
+                    )
+
+
+            prompt = st.chat_input(
+                "Mesajınızı yazın..."
+            )
+
 
             if prompt:
 
                 if not st.session_state.current_chat_id:
 
-                    new_id = str(uuid.uuid4())
+                    new_id = str(
+                        uuid.uuid4()
+                    )
 
                     st.session_state.current_chat_id = new_id
 
+
                     title = (
                         prompt[:35]
-                        + ("..." if len(prompt) > 35 else "")
+                        +
+                        (
+                            "..."
+                            if len(prompt) > 35
+                            else ""
+                        )
                     )
 
-                    now_str = datetime.now().strftime(
-                        "%d.%m.%Y %H:%M"
+
+                    now_str = (
+                        datetime.now()
+                        .strftime(
+                            "%d.%m.%Y %H:%M"
+                        )
                     )
+
 
                     st.session_state.chats[new_id] = {
                         "title": title,
                         "date": now_str,
                         "messages": []
                     }
+
+
+                st.chat_message(
+                    "user"
+                ).markdown(
+                    prompt
+                )
+
 
                 st.session_state.chats[
                     st.session_state.current_chat_id
@@ -505,17 +818,19 @@ else:
                     }
                 )
 
-                with st.chat_message("user"):
-                    st.markdown(prompt)
 
-                with st.chat_message("assistant"):
+                with st.chat_message(
+                    "assistant"
+                ):
 
                     try:
 
                         system_prompt = (
-                            "Sen bir motivasyon ve alışkanlık koçusun. "
+                            "Sen bir motivasyon ve "
+                            "alışkanlık koçusun. "
                             f"Kullanıcı adı: {display_name}."
                         )
+
 
                         api_messages = [
                             {
@@ -524,9 +839,14 @@ else:
                             }
                         ]
 
-                        for msg in st.session_state.chats[
-                            st.session_state.current_chat_id
-                        ]["messages"]:
+
+                        for msg in (
+                            st.session_state
+                            .chats[
+                                st.session_state
+                                .current_chat_id
+                            ]["messages"]
+                        ):
 
                             api_messages.append(
                                 {
@@ -534,6 +854,7 @@ else:
                                     "content": msg["content"]
                                 }
                             )
+
 
                         chat_completion = (
                             client
@@ -545,6 +866,7 @@ else:
                             )
                         )
 
+
                         ai_reply = (
                             chat_completion
                             .choices[0]
@@ -552,7 +874,11 @@ else:
                             .content
                         )
 
-                        st.markdown(ai_reply)
+
+                        st.markdown(
+                            ai_reply
+                        )
+
 
                         st.session_state.chats[
                             st.session_state.current_chat_id
@@ -563,34 +889,51 @@ else:
                             }
                         )
 
+
                     except Exception as e:
-                        st.error(f"Sistem Hatası: {e}")
+
+                        st.error(
+                            f"Sistem Hatası: {e}"
+                        )
+
 
     # ========================================================
-    # İLERLEMELER
+    # 8. İLERLEMELER
     # ========================================================
 
     elif st.session_state.sayfa == "📊 İlerlemelerim":
 
-        st.title("📊 İlerlemelerim")
+        st.title(
+            "📊 İlerlemelerim"
+        )
 
-        st.info("Bu sayfa henüz geliştirilmedi.")
+        st.info(
+            "Bu sayfa henüz geliştirilmedi."
+        )
+
 
     # ========================================================
-    # AI GEÇMİŞİ
+    # 9. AI GEÇMİŞİ
     # ========================================================
 
     elif st.session_state.sayfa == "📜 AI Geçmişim":
 
-        st.title("📜 AI Geçmişim")
+        st.title(
+            "📜 AI Geçmişim"
+        )
+
 
         if not st.session_state.chats:
 
-            st.info("Henüz sohbet yok.")
+            st.info(
+                "Henüz sohbet yok."
+            )
 
         else:
 
-            for chat_id, chat in st.session_state.chats.items():
+            for chat_id, chat in (
+                st.session_state.chats.items()
+            ):
 
                 with st.expander(
                     f"{chat['title']} — {chat['date']}"
@@ -599,24 +942,36 @@ else:
                     for msg in chat["messages"]:
 
                         if msg["role"] == "user":
+
                             st.markdown(
-                                f"**👤 Sen:** {msg['content']}"
-                            )
-                        else:
-                            st.markdown(
-                                f"**🤖 AI:** {msg['content']}"
+                                f"**👤 Sen:** "
+                                f"{msg['content']}"
                             )
 
+                        else:
+
+                            st.markdown(
+                                f"**🤖 AI:** "
+                                f"{msg['content']}"
+                            )
+
+
     # ========================================================
-    # PROFİL
+    # 10. PROFİL
     # ========================================================
 
     elif st.session_state.sayfa == "👤 Profilim":
 
-        st.title("👤 Profilim")
+        st.title(
+            "👤 Profilim"
+        )
 
-        # Başarılı kayıt mesajı
-        if st.session_state.get("profile_saved", False):
+
+        # ----------------------------------------------------
+        # KAYDEDİLDİ MESAJI
+        # ----------------------------------------------------
+
+        if st.session_state.profile_saved:
 
             st.success(
                 "✅ Profil bilgileriniz başarıyla kaydedildi!"
@@ -624,58 +979,99 @@ else:
 
             st.session_state.profile_saved = False
 
+
         st.markdown("---")
 
-        # ------------------------------------------------------
-        # MEVCUT FOTOĞRAF
-        # ------------------------------------------------------
 
-        current_avatar = st.session_state.get("avatar_url", "")
+        # ----------------------------------------------------
+        # MEVCUT PROFİL FOTOĞRAFI
+        # ----------------------------------------------------
 
-        if current_avatar:
+        if st.session_state.avatar_url:
 
-            try:
-                st.image(
-                    current_avatar,
-                    width=150
-                )
-            except Exception:
-                st.markdown("### 👤 Profil Fotoğrafı")
+            st.image(
+                st.session_state.avatar_url,
+                width=150
+            )
 
         else:
-            st.markdown("### 👤 Profil Fotoğrafı")
 
-        # ------------------------------------------------------
+            st.markdown(
+                "### 👤 Profil Fotoğrafı"
+            )
+
+
+        # ----------------------------------------------------
         # FORM
-        # ------------------------------------------------------
+        # ----------------------------------------------------
 
-        with st.form("profile_form"):
+        with st.form(
+            "profile_form"
+        ):
 
-            st.subheader("Profil Bilgilerini Düzenle")
+            st.subheader(
+                "Profil Bilgilerini Düzenle"
+            )
+
+
+            # -----------------------------------------------
+            # PROFİL FOTOĞRAFI
+            # -----------------------------------------------
 
             new_avatar = st.file_uploader(
                 "📷 Profil Fotoğrafı",
-                type=["jpg", "jpeg", "png", "webp"],
-                help="JPG, JPEG, PNG veya WEBP seçebilirsin."
+                type=[
+                    "jpg",
+                    "jpeg",
+                    "png",
+                    "webp"
+                ],
+                help=(
+                    "JPG, JPEG, PNG veya WEBP "
+                    "formatında bir fotoğraf seç."
+                )
             )
+
+
+            # -----------------------------------------------
+            # AD SOYAD
+            # -----------------------------------------------
 
             new_name = st.text_input(
                 "Ad Soyad",
                 value=st.session_state.profile_name
             )
 
+
+            # -----------------------------------------------
+            # DOĞUM TARİHİ
+            # -----------------------------------------------
+
             try:
+
                 current_bdate = datetime.strptime(
                     st.session_state.birth_date,
                     "%Y-%m-%d"
                 ).date()
+
             except Exception:
-                current_bdate = date(2000, 1, 1)
+
+                current_bdate = date(
+                    2000,
+                    1,
+                    1
+                )
+
 
             new_bdate = st.date_input(
                 "Doğum Tarihi",
                 value=current_bdate
             )
+
+
+            # -----------------------------------------------
+            # CİNSİYET
+            # -----------------------------------------------
 
             gender_options = [
                 "Kadın",
@@ -683,12 +1079,22 @@ else:
                 "Belirtmek İstemiyorum"
             ]
 
-            if st.session_state.gender in gender_options:
-                current_gender_idx = gender_options.index(
-                    st.session_state.gender
+
+            if (
+                st.session_state.gender
+                in gender_options
+            ):
+
+                current_gender_idx = (
+                    gender_options.index(
+                        st.session_state.gender
+                    )
                 )
+
             else:
+
                 current_gender_idx = 2
+
 
             new_gender = st.selectbox(
                 "Cinsiyet",
@@ -696,59 +1102,92 @@ else:
                 index=current_gender_idx
             )
 
+
             st.markdown("")
 
-            col_save, col_cancel = st.columns(2)
+
+            # -----------------------------------------------
+            # BUTONLAR
+            # -----------------------------------------------
+
+            col_save, col_cancel = st.columns(
+                2
+            )
+
 
             with col_save:
+
                 submitted = st.form_submit_button(
                     "💾 Kaydet",
                     type="primary",
                     use_container_width=True
                 )
 
+
             with col_cancel:
+
                 cancel = st.form_submit_button(
                     "İptal",
                     use_container_width=True
                 )
 
-        # ------------------------------------------------------
+
+        # ====================================================
         # İPTAL
-        # ------------------------------------------------------
+        # ====================================================
 
         if cancel:
 
-            st.session_state.sayfa = "🌱 AI Koç & Sohbet"
+            st.session_state.sayfa = (
+                "🌱 AI Koç & Sohbet"
+            )
+
             st.rerun()
 
-        # ------------------------------------------------------
+
+        # ====================================================
         # KAYDET
-        # ------------------------------------------------------
+        # ====================================================
 
         if submitted:
 
             if not new_name.strip():
 
-                st.error("Ad Soyad boş olamaz.")
+                st.error(
+                    "Ad Soyad boş olamaz."
+                )
 
             elif not supabase:
 
-                st.error("Supabase bağlantısı kurulamadı.")
+                st.error(
+                    "Supabase bağlantısı kurulamadı."
+                )
 
             else:
 
                 try:
 
-                    access_token = st.session_state.get(
-                        "access_token"
+                    # -----------------------------------------
+                    # TOKENLARI AL
+                    # -----------------------------------------
+
+                    access_token = (
+                        st.session_state.get(
+                            "access_token"
+                        )
                     )
 
-                    refresh_token = st.session_state.get(
-                        "refresh_token"
+                    refresh_token = (
+                        st.session_state.get(
+                            "refresh_token"
+                        )
                     )
 
-                    if not access_token or not refresh_token:
+
+                    if (
+                        not access_token
+                        or not refresh_token
+                    ):
 
                         st.error(
                             "Oturum bilgisi bulunamadı. "
@@ -757,97 +1196,96 @@ else:
 
                         st.stop()
 
-                    # Session'ı Supabase'e geri yükle
-                    session_result = supabase.auth.set_session(
+
+                    # -----------------------------------------
+                    # SUPABASE SESSION'I GERİ YÜKLE
+                    # -----------------------------------------
+
+                    supabase.auth.set_session(
                         access_token,
                         refresh_token
                     )
 
-                    # Refresh edilmiş token varsa state'i güncelle
-                    if session_result and getattr(
-                        session_result,
-                        "session",
-                        None
-                    ):
 
-                        st.session_state.access_token = (
-                            session_result.session.access_token
+                    # -----------------------------------------
+                    # AVATAR URL
+                    # -----------------------------------------
+
+                    avatar_url = (
+                        st.session_state.get(
+                            "avatar_url",
+                            ""
                         )
-
-                        st.session_state.refresh_token = (
-                            session_result.session.refresh_token
-                        )
-
-                    # Mevcut avatar
-                    avatar_url = st.session_state.get(
-                        "avatar_url",
-                        ""
                     )
 
-                    # ------------------------------------------------
-                    # FOTOĞRAF YÜKLE
-                    # ------------------------------------------------
+
+                    # -----------------------------------------
+                    # YENİ FOTOĞRAF YÜKLENDİYSE
+                    # -----------------------------------------
 
                     if new_avatar is not None:
 
-                        user_id = st.session_state.user.id
+                        user_id = (
+                            st.session_state
+                            .user
+                            .id
+                        )
 
-                        extension = (
+
+                        # Dosya uzantısını al
+                        file_extension = (
                             new_avatar.name
-                            .rsplit(".", 1)[-1]
+                            .split(".")[-1]
                             .lower()
                         )
 
+
+                        # Kullanıcıya özel dosya yolu
                         file_path = (
-                            f"{user_id}/profile.{extension}"
+                            f"{user_id}/profile."
+                            f"{file_extension}"
                         )
 
-                        file_bytes = new_avatar.getvalue()
 
-                        # Önce aynı kullanıcının eski olası
-                        # dosyalarını silmeye çalış
-                        old_extensions = [
-                            "jpg",
-                            "jpeg",
-                            "png",
-                            "webp"
-                        ]
-
-                        old_files = [
-                            f"{user_id}/profile.{ext}"
-                            for ext in old_extensions
-                            if ext != extension
-                        ]
-
-                        try:
-                            supabase.storage.from_(
-                                "avatars"
-                            ).remove(old_files)
-                        except Exception:
-                            pass
-
-                        # Yeni fotoğrafı yükle
-                        supabase.storage.from_(
-                            "avatars"
-                        ).upload(
-                            file_path,
-                            file_bytes,
-                            {
-                                "content-type": new_avatar.type,
-                                "upsert": True
-                            }
+                        file_bytes = (
+                            new_avatar.getvalue()
                         )
 
-                        # Public URL al
+
+                        # -------------------------------------
+                        # STORAGE'A YÜKLE
+                        # -------------------------------------
+
+                        supabase.storage \
+                            .from_("avatars") \
+                            .upload(
+                                file_path,
+                                file_bytes,
+                                {
+                                    "content-type": (
+                                        new_avatar.type
+                                    },
+                                    "upsert": "true"
+                                }
+                            )
+
+
+                        # -------------------------------------
+                        # PUBLIC URL
+                        # -------------------------------------
+
                         avatar_url = (
                             supabase.storage
                             .from_("avatars")
-                            .get_public_url(file_path)
+                            .get_public_url(
+                                file_path
+                            )
                         )
 
-                    # ------------------------------------------------
-                    # AUTH METADATA GÜNCELLE
-                    # ------------------------------------------------
+
+                    # -----------------------------------------
+                    # USER METADATA GÜNCELLE
+                    # -----------------------------------------
 
                     update_result = (
                         supabase
@@ -855,48 +1293,53 @@ else:
                         .update_user(
                             {
                                 "data": {
-                                    "full_name": new_name.strip(),
-                                    "birth_date": str(new_bdate),
-                                    "gender": new_gender,
-                                    "avatar_url": avatar_url
+                                    "full_name": (
+                                        new_name.strip()
+                                    ),
+                                    "birth_date": (
+                                        str(new_bdate)
+                                    ),
+                                    "gender": (
+                                        new_gender
+                                    ),
+                                    "avatar_url": (
+                                        avatar_url
+                                    )
                                 }
                             }
                         )
                     )
 
-                    # Yeni session döndüyse tokenları güncelle
+
+                    # -----------------------------------------
+                    # YENİ TOKENLAR GELDİYSE SAKLA
+                    # -----------------------------------------
+
                     if (
-                        update_result
-                        and getattr(
+                        hasattr(
                             update_result,
-                            "session",
-                            None
+                            "session"
                         )
+                        and update_result.session
                     ):
 
                         st.session_state.access_token = (
-                            update_result.session.access_token
+                            update_result
+                            .session
+                            .access_token
                         )
 
                         st.session_state.refresh_token = (
-                            update_result.session.refresh_token
+                            update_result
+                            .session
+                            .refresh_token
                         )
 
-                    # Kullanıcı state'ini de güncelle
-                    if (
-                        update_result
-                        and getattr(
-                            update_result,
-                            "user",
-                            None
-                        )
-                    ):
 
-                        st.session_state.user = (
-                            update_result.user
-                        )
+                    # -----------------------------------------
+                    # LOCAL STATE GÜNCELLE
+                    # -----------------------------------------
 
-                    # Local profil bilgileri
                     st.session_state.profile_name = (
                         new_name.strip()
                     )
@@ -913,10 +1356,15 @@ else:
                         avatar_url
                     )
 
-                    # Yeşil başarı kutusu için flag
+
+                    # -----------------------------------------
+                    # BAŞARILI
+                    # -----------------------------------------
+
                     st.session_state.profile_saved = True
 
                     st.rerun()
+
 
                 except Exception as e:
 
@@ -924,7 +1372,9 @@ else:
                         f"Profil kaydedilirken hata oluştu: {e}"
                     )
 
+
         st.markdown("---")
+
 
         st.write(
             f"**E-posta:** {user_email}"
