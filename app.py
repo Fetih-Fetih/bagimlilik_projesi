@@ -558,34 +558,38 @@ if not st.session_state.user:
     </style>
     """, unsafe_allow_html=True)
 
-    # JavaScript: scroll ile görünürlüğü algıla ve .visible ekle
+    # JavaScript: doğru scroll container'ı dinle
     components.html("""
     <script>
     (function() {
+        function isElementInViewport(el) {
+            var rect = el.getBoundingClientRect();
+            var windowHeight = window.innerHeight || document.documentElement.clientHeight;
+            return rect.top <= windowHeight * 0.85 && rect.bottom >= 0;
+        }
+        
         function handleScroll() {
             var cards = document.querySelectorAll('.slogan-card');
-            var windowHeight = window.innerHeight;
-            
             cards.forEach(function(card) {
-                if (!card.classList.contains('visible')) {
-                    var rect = card.getBoundingClientRect();
-                    if (rect.top < windowHeight * 0.85) {
-                        card.classList.add('visible');
-                    }
+                if (!card.classList.contains('visible') && isElementInViewport(card)) {
+                    card.classList.add('visible');
                 }
             });
         }
         
-        // İlk yüklemede ve scroll sırasında kontrol et
-        window.addEventListener('scroll', handleScroll);
-        window.addEventListener('load', handleScroll);
-        document.addEventListener('DOMContentLoaded', function() {
-            handleScroll();
-        });
+        // Streamlit ana kapsayıcısını bul
+        var mainContainer = document.querySelector('[data-testid="stAppViewContainer"]') || document;
         
-        // Biraz gecikmeli tekrar kontrol (Streamlit render sonrası)
+        // Scroll olaylarını dinle
+        mainContainer.addEventListener('scroll', handleScroll);
+        window.addEventListener('scroll', handleScroll);
+        document.addEventListener('scroll', handleScroll);
+        
+        // İlk yükleme ve gecikmeli kontroller
+        handleScroll();
+        setTimeout(handleScroll, 500);
         setTimeout(handleScroll, 1000);
-        setTimeout(handleScroll, 3000);
+        setTimeout(handleScroll, 2000);
     })();
     </script>
     """, height=0, width=0)
@@ -736,7 +740,7 @@ if not st.session_state.user:
     </div>
     """, unsafe_allow_html=True)
 
-    # Slogan kartları (başlangıçta gizli, scroll ile görünür olacak)
+    # Slogan kartları
     slogans = [
         {
             "title": "💪 Güçlü Bir Sen",
