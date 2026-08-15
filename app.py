@@ -1,9 +1,10 @@
 import streamlit as st
 from supabase import create_client, Client
 from groq import Groq
+import extra_streamlit_components as stx
 import uuid
 import re
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 
 # ============================================================
@@ -82,6 +83,20 @@ def get_supabase_client() -> Client | None:
 
 
 supabase = get_supabase_client()
+
+
+# ============================================================
+# 3B. TARAYICI ÇEREZ YÖNETİCİSİ (kalıcı oturum için)
+# ============================================================
+
+AUTH_COOKIE_NAME = "habit_coach_refresh_token"
+
+
+def get_cookie_manager() -> stx.CookieManager:
+    return stx.CookieManager(key="cookie_manager_main")
+
+
+cookie_manager = get_cookie_manager()
 
 
 # ============================================================
@@ -251,6 +266,39 @@ def upload_avatar(user_id: str, uploaded_file) -> str | None:
         return None
 
 
+def apply_auth_session(user, session) -> None:
+    """Giriş sonrası ya da çerezden otomatik oturum açarken kullanılan ortak kod:
+    kullanıcı, token ve profil bilgilerini session_state'e yazar."""
+
+    st.session_state.user = user
+
+    if session:
+
+        st.session_state.access_token = session.access_token
+        st.session_state.refresh_token = session.refresh_token
+
+    meta = user.user_metadata or {}
+
+    st.session_state.profile_name = meta.get(
+        "full_name", user.email.split("@")[0]
+    )
+
+    st.session_state.birth_date = meta.get("birth_date", "2000-01-01")
+    st.session_state.gender = meta.get("gender", "Belirtilmedi")
+    st.session_state.avatar_url = meta.get("avatar_url", "")
+
+    created_at = getattr(user, "created_at", None)
+
+    st.session_state.gun_sayisi = calculate_day_count(
+        str(created_at) if created_at else ""
+    )
+
+    st.session_state.chats = load_chats_from_db(user.id)
+    st.session_state.current_chat_id = None
+    st.session_state.sayfa = "🌱 AI Koç & Sohbet"
+    st.session_state.show_auth_modal = False
+
+
 # ============================================================
 # 5. SESSION STATE
 # ============================================================
@@ -290,6 +338,53 @@ if "gender" not in st.session_state:
 
 if "avatar_url" not in st.session_state:
     st.session_state.avatar_url = ""
+
+
+# ============================================================
+# 5B. TARAYICI ÇEREZİNDEN OTOMATİK OTURUM AÇMA
+# ============================================================
+# Sayfa yenilendiğinde veya tarayıcı kapatılıp açıldığında,
+# daha önce kaydedilmiş refresh token varsa oturumu otomatik geri yükler.
+
+if st.session_state.user is None and not st.session_state.get("auth_restore_done", False):
+
+    cookies = cookie_manager.get_all()
+
+    if cookies is not None:
+
+        st.session_state.auth_restore_done = True
+
+        saved_refresh_token = cookies.get(AUTH_COOKIE_NAME)
+
+        if saved_refresh_token and supabase:
+
+            try:
+
+                res = supabase.auth.refresh_session(saved_refresh_token)
+
+                if res and res.user and res.session:
+
+                    apply_auth_session(res.user, res.session)
+                    st.session_state.auto_restored_notice = True
+
+                    cookie_manager.set(
+                        AUTH_COOKIE_NAME,
+                        res.session.refresh_token,
+                        expires_at=datetime.utcnow() + timedelta(days=30),
+                        key="set_cookie_restore"
+                    )
+
+                    st.rerun()
+
+            except Exception:
+
+                try:
+
+                    cookie_manager.delete(AUTH_COOKIE_NAME, key="delete_cookie_restore")
+
+                except Exception:
+
+                    pass
 
 
 # ============================================================
@@ -347,6 +442,18 @@ if not st.session_state.user:
                     email = st.text_input("E-Posta Adresi", key="l_email")
                     password = st.text_input("Şifre", type="password", key="l_pass")
 
+                    remember_device = st.checkbox(
+                        "🔒 Bu cihazı hatırla",
+                        value=False,
+                        key="l_remember",
+                        help=(
+                            "Sadece kendi kişisel cihazında işaretle. "
+                            "İşaretlersen 30 gün boyunca tekrar giriş "
+                            "istenmez — ortak/paylaşılan bir cihazda "
+                            "bunu işaretleme."
+                        )
+                    )
+
                     if st.button("Giriş Yap", type="primary", key="btn_l", use_container_width=True):
 
                         if not email or not password:
@@ -369,59 +476,24 @@ if not st.session_state.user:
                                 )
 
                                 # ---------------------------------
-                                # KULLANICI
+                                # KULLANICI, TOKEN VE PROFİL BİLGİLERİ
                                 # ---------------------------------
 
-                                st.session_state.user = res.user
+                                apply_auth_session(res.user, res.session)
 
                                 # ---------------------------------
-                                # SESSION TOKENLARI
+                                # KALICI OTURUM İÇİN ÇEREZE YAZ
+                                # (sadece "Bu cihazı hatırla" işaretliyse)
                                 # ---------------------------------
 
-                                if res.session:
+                                if res.session and remember_device:
 
-                                    st.session_state.access_token = res.session.access_token
-                                    st.session_state.refresh_token = res.session.refresh_token
-
-                                # ---------------------------------
-                                # PROFİL BİLGİLERİ
-                                # ---------------------------------
-
-                                meta = res.user.user_metadata or {}
-
-                                st.session_state.profile_name = meta.get(
-                                    "full_name", email.split("@")[0]
-                                )
-
-                                st.session_state.birth_date = meta.get(
-                                    "birth_date", "2000-01-01"
-                                )
-
-                                st.session_state.gender = meta.get(
-                                    "gender", "Belirtilmedi"
-                                )
-
-                                st.session_state.avatar_url = meta.get("avatar_url", "")
-
-                                # ---------------------------------
-                                # GÜN SAYISI (kayıt tarihinden bu yana)
-                                # ---------------------------------
-
-                                created_at = getattr(res.user, "created_at", None)
-
-                                st.session_state.gun_sayisi = calculate_day_count(
-                                    str(created_at) if created_at else ""
-                                )
-
-                                # ---------------------------------
-                                # SOHBET GEÇMİŞİNİ VERİTABANINDAN YÜKLE
-                                # ---------------------------------
-
-                                st.session_state.chats = load_chats_from_db(res.user.id)
-
-                                st.session_state.current_chat_id = None
-                                st.session_state.sayfa = "🌱 AI Koç & Sohbet"
-                                st.session_state.show_auth_modal = False
+                                    cookie_manager.set(
+                                        AUTH_COOKIE_NAME,
+                                        res.session.refresh_token,
+                                        expires_at=datetime.utcnow() + timedelta(days=30),
+                                        key="set_cookie_login"
+                                    )
 
                                 st.rerun()
 
@@ -541,6 +613,51 @@ else:
     display_name = st.session_state.get("profile_name", user_email.split("@")[0])
 
     # ========================================================
+    # OTOMATİK GİRİŞ UYARISI
+    # ========================================================
+    # Çerezden otomatik giriş yapıldıysa, bu cihazın hesabı olup
+    # olmadığını kullanıcının fark etmesi için bir kez göster.
+
+    if st.session_state.get("auto_restored_notice", False):
+
+        st.session_state.auto_restored_notice = False
+
+        notice_col, notice_btn_col = st.columns([5, 1.3])
+
+        with notice_col:
+
+            st.info(
+                f"🔒 Bu cihazda **{display_name}** ({user_email}) "
+                "olarak otomatik giriş yapıldı. Bu sen değilsen "
+                "hemen çıkış yap."
+            )
+
+        with notice_btn_col:
+
+            if st.button("🚪 Ben değilim, çıkış yap", use_container_width=True):
+
+                if supabase:
+
+                    try:
+
+                        supabase.auth.sign_out()
+
+                    except Exception:
+
+                        pass
+
+                try:
+
+                    cookie_manager.delete(AUTH_COOKIE_NAME, key="delete_cookie_notice")
+
+                except Exception:
+
+                    pass
+
+                st.session_state.clear()
+                st.rerun()
+
+    # ========================================================
     # MENÜ
     # ========================================================
 
@@ -608,6 +725,14 @@ else:
                     except Exception:
 
                         pass
+
+                try:
+
+                    cookie_manager.delete(AUTH_COOKIE_NAME, key="delete_cookie_logout")
+
+                except Exception:
+
+                    pass
 
                 st.session_state.clear()
                 st.rerun()
