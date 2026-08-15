@@ -469,54 +469,35 @@ if st.session_state.user is None and not st.session_state.get("auth_restore_done
 
 if not st.session_state.user:
 
-    # CSS ile scroll animasyonları
+    # CSS stilleri
     st.markdown("""
     <style>
-    .hero-section {
-        background: linear-gradient(180deg, #000000 0%, #1a1a2e 50%, #16213e 100%);
-        min-height: 100vh;
+    .hero {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         padding: 60px 20px;
         text-align: center;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-    }
-    
-    .hero-title {
-        color: white;
-        font-size: 4rem;
-        font-weight: bold;
+        border-radius: 20px;
         margin-bottom: 20px;
-        opacity: 0;
-        animation: fadeInUp 1.5s forwards;
-        animation-delay: 0.3s;
     }
     
-    .hero-subtitle {
-        color: #a0a0a0;
-        font-size: 1.5rem;
-        margin-bottom: 40px;
-        opacity: 0;
-        animation: fadeInUp 1.5s forwards;
-        animation-delay: 0.8s;
-    }
-    
-    .scroll-indicator {
-        position: fixed;
-        bottom: 30px;
-        left: 50%;
-        transform: translateX(-50%);
+    .hero h1 {
         color: white;
-        font-size: 2rem;
-        animation: bounce 2s infinite;
-        opacity: 0.7;
+        font-size: 3rem;
+        font-weight: bold;
+        margin-bottom: 15px;
+        animation: slideDown 1s ease-out;
     }
     
-    @keyframes fadeInUp {
+    .hero p {
+        color: #f0f0f0;
+        font-size: 1.3rem;
+        animation: slideDown 1s ease-out 0.3s both;
+    }
+    
+    @keyframes slideDown {
         from {
             opacity: 0;
-            transform: translateY(50px);
+            transform: translateY(-30px);
         }
         to {
             opacity: 1;
@@ -524,131 +505,63 @@ if not st.session_state.user:
         }
     }
     
-    @keyframes bounce {
-        0%, 20%, 50%, 80%, 100% {
-            transform: translateY(0) translateX(-50%);
-        }
-        40% {
-            transform: translateY(-20px) translateX(-50%);
-        }
-        60% {
-            transform: translateY(-10px) translateX(-50%);
-        }
-    }
-    
-    .reveal {
-        opacity: 0;
-        transform: translateY(50px);
-        transition: all 1s ease;
-    }
-    
-    .reveal.active {
-        opacity: 1;
-        transform: translateY(0);
-    }
-    
-    .feature-section {
-        min-height: 60vh;
-        padding: 80px 20px;
+    .slogan-card {
+        padding: 40px 20px;
+        margin: 15px 0;
+        border-radius: 15px;
         text-align: center;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        border-radius: 20px;
-        margin: 20px 0;
+        opacity: 0;
+        animation: fadeInUp 0.7s ease-out forwards;
     }
     
-    .feature-title {
-        font-size: 2.5rem;
+    .slogan-card h2 {
+        font-size: 2rem;
+        margin-bottom: 15px;
         font-weight: bold;
-        margin-bottom: 20px;
-        color: white;
-        text-shadow: 2px 2px 8px rgba(0,0,0,0.3);
     }
     
-    .feature-text {
-        font-size: 1.3rem;
-        color: #e0e0e0;
+    .slogan-card p {
+        font-size: 1.2rem;
         line-height: 1.6;
-        max-width: 600px;
+        font-style: italic;
     }
     
-    .section-1 {
-        background: linear-gradient(180deg, #16213e 0%, #0f3460 100%);
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(40px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
     
-    .section-2 {
-        background: linear-gradient(180deg, #0f3460 0%, #533483 100%);
-    }
+    .color-1 { background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%); }
+    .color-1 h2, .color-1 p { color: #333; }
     
-    .section-3 {
-        background: linear-gradient(180deg, #533483 0%, #e94560 100%);
-    }
+    .color-2 { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+    .color-2 h2, .color-2 p { color: white; }
     
-    .section-4 {
-        background: linear-gradient(180deg, #e94560 0%, #ff6b6b 100%);
-    }
+    .color-3 { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+    .color-3 h2, .color-3 p { color: white; }
     
-    .section-5 {
-        background: linear-gradient(180deg, #ff6b6b 0%, #ffa502 100%);
-    }
+    .color-4 { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+    .color-4 h2, .color-4 p { color: #333; }
     
-    .section-6 {
-        background: linear-gradient(180deg, #ffa502 0%, #f9ca24 100%);
-    }
+    .color-5 { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+    .color-5 h2, .color-5 p { color: #333; }
     
-    .section-7 {
-        background: linear-gradient(180deg, #f9ca24 0%, #a4de02 100%);
-    }
+    .color-6 { background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%); }
+    .color-6 h2, .color-6 p { color: #333; }
     
-    .section-8 {
-        background: linear-gradient(180deg, #a4de02 0%, #ffffff 100%);
-    }
+    .color-7 { background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); }
+    .color-7 h2, .color-7 p { color: #333; }
     
-    .section-8 .feature-title {
-        color: #333;
-        text-shadow: none;
-    }
-    
-    .section-8 .feature-text {
-        color: #555;
-    }
-    
+    .color-8 { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); }
+    .color-8 h2, .color-8 p { color: #333; }
     </style>
     """, unsafe_allow_html=True)
-
-    # JavaScript ile scroll animasyonu
-    components.html("""
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('active');
-                }
-            });
-        }, {
-            threshold: 0.3
-        });
-        
-        document.querySelectorAll('.reveal').forEach(el => {
-            observer.observe(el);
-        });
-        
-        window.addEventListener('scroll', function() {
-            const indicator = document.querySelector('.scroll-indicator');
-            if (indicator) {
-                if (window.scrollY > 100) {
-                    indicator.style.opacity = '0';
-                } else {
-                    indicator.style.opacity = '0.7';
-                }
-            }
-        });
-    });
-    </script>
-    """, height=0, width=0)
 
     # Üst menü
     col_logo, col_space, col_login, col_register = st.columns([3, 4, 1.5, 1.5])
@@ -790,70 +703,77 @@ if not st.session_state.user:
 
     # Hero bölümü
     st.markdown("""
-    <div class="hero-section">
-        <h1 class="hero-title">Ekrandan Çık, Hayata Gir 🚀</h1>
-        <p class="hero-subtitle">Bağımlılıklarından kurtul, gerçek potansiyelini keşfet</p>
-        <div class="scroll-indicator">⌄</div>
+    <div class="hero">
+        <h1>Ekrandan Çık, Hayata Gir 🚀</h1>
+        <p>Bağımlılıklarından kurtul, gerçek potansiyelini keşfet</p>
     </div>
     """, unsafe_allow_html=True)
 
-    # Feature bölümleri
-    sections = [
+    # Slogan kartları
+    slogans = [
         {
             "title": "💪 Güçlü Bir Sen",
             "text": "Her gün bir adım at, bağımlılıklarının esiri olma. Sen kontrol sende!",
-            "class": "section-1"
+            "color": "color-1",
+            "delay": "0.2s"
         },
         {
             "title": "🎯 Hedefine Odaklan",
             "text": "Ekran başında geçen her saat, hayallerinden çalınan bir saattir.",
-            "class": "section-2"
+            "color": "color-2",
+            "delay": "0.5s"
         },
         {
             "title": "🌅 Yeni Bir Başlangıç",
             "text": "Bugün bırak, yarın özgür ol. Bağımlılık zincirlerini kır!",
-            "class": "section-3"
+            "color": "color-3",
+            "delay": "0.8s"
         },
         {
             "title": "🧠 Zihnini Özgürleştir",
             "text": "Teknoloji sana hizmet etsin, sen teknolojiye değil.",
-            "class": "section-4"
+            "color": "color-4",
+            "delay": "1.1s"
         },
         {
             "title": "❤️ Gerçek Bağlantılar",
             "text": "Sanal dünyada kaybolma, gerçek ilişkiler kur.",
-            "class": "section-5"
+            "color": "color-5",
+            "delay": "1.4s"
         },
         {
             "title": "🌟 Parlak Gelecek",
             "text": "Her bağımlılıktan kurtuluş, yeni bir hayatın başlangıcıdır.",
-            "class": "section-6"
+            "color": "color-6",
+            "delay": "1.7s"
         },
         {
             "title": "🏃‍♂️ Harekete Geç",
             "text": "Düşünme, yap! Alışkanlıklarını değiştir, hayatın değişsin.",
-            "class": "section-7"
+            "color": "color-7",
+            "delay": "2.0s"
         },
         {
             "title": "🔓 Özgürlüğe Giden Yol",
             "text": "Bağımlılık bir kafestir. Anahtar senin elinde.",
-            "class": "section-8"
+            "color": "color-8",
+            "delay": "2.3s"
         }
     ]
 
-    for section in sections:
+    for slogan in slogans:
         st.markdown(f"""
-        <div class="feature-section {section['class']} reveal">
-            <div class="feature-title">{section['title']}</div>
-            <div class="feature-text">"{section['text']}"</div>
+        <div class="slogan-card {slogan['color']}" style="animation-delay: {slogan['delay']};">
+            <h2>{slogan['title']}</h2>
+            <p>"{slogan['text']}"</p>
         </div>
         """, unsafe_allow_html=True)
 
     # Alt bilgi
     st.markdown("""
-    <div style="text-align: center; padding: 60px 20px; background: white; color: #333;">
-        <h2 style="font-size: 2rem; margin-bottom: 20px;">🌱 Her gün yeni bir başlangıçtır</h2>
-        <p style="font-size: 1.2rem;">Şimdi başla! Karakter & Alışkanlık Koçu ile hayatını dönüştür</p>
+    <div style="text-align: center; padding: 40px 20px; background: #f8f9fa; border-radius: 15px; margin-top: 20px;">
+        <h2 style="font-size: 2rem; margin-bottom: 15px; color: #333;">🌱 Her gün yeni bir başlangıçtır</h2>
+        <p style="font-size: 1.2rem; color: #666;">Şimdi başla! Karakter & Alışkanlık Koçu ile hayatını dönüştür</p>
     </div>
     """, unsafe_allow_html=True)
 
