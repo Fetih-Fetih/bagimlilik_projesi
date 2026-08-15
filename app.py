@@ -470,6 +470,77 @@ if st.session_state.user is None and not st.session_state.get("auth_restore_done
 
 if not st.session_state.user:
 
+    # CSS ile arka plan gradyanı ve animasyonlar
+    st.markdown("""
+    <style>
+    .main-header {
+        background: linear-gradient(180deg, #1a1a2e 0%, #16213e 30%, #0f3460 60%, #533483 80%, #e0e0e0 100%);
+        padding: 80px 20px 60px 20px;
+        border-radius: 20px;
+        text-align: center;
+        margin-bottom: 30px;
+    }
+    
+    .main-title {
+        color: white;
+        font-size: 2.8rem;
+        font-weight: bold;
+        margin-bottom: 20px;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    }
+    
+    .main-subtitle {
+        color: #e0e0e0;
+        font-size: 1.3rem;
+        margin-bottom: 30px;
+    }
+    
+    .slogan-section {
+        padding: 40px 20px;
+        margin: 20px 0;
+        border-radius: 15px;
+        text-align: center;
+        animation: fadeIn 1s ease-in;
+    }
+    
+    .slogan-title {
+        font-size: 1.8rem;
+        font-weight: bold;
+        margin-bottom: 15px;
+        color: #333;
+    }
+    
+    .slogan-text {
+        font-size: 1.2rem;
+        color: #555;
+        font-style: italic;
+        line-height: 1.6;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .gradient-bg {
+        background: linear-gradient(180deg, 
+            #1a1a2e 0%, 
+            #16213e 20%, 
+            #0f3460 40%, 
+            #533483 60%, 
+            #e94560 80%, 
+            #ffffff 100%);
+        min-height: 100vh;
+        padding: 20px;
+        border-radius: 10px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Ana container
+    st.markdown('<div class="gradient-bg">', unsafe_allow_html=True)
+
+    # Üst menü
     col_logo, col_space, col_login, col_register = st.columns([3, 4, 1.5, 1.5])
 
     with col_logo:
@@ -487,6 +558,7 @@ if not st.session_state.user:
 
     st.divider()
 
+    # Giriş modal'ı
     if st.session_state.show_auth_modal:
 
         _, auth_col, _ = st.columns([1, 2, 1])
@@ -608,26 +680,75 @@ if not st.session_state.user:
                 st.session_state.show_auth_modal = False
                 st.rerun()
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    # Ana başlık
+    st.markdown("""
+    <div class="main-header">
+        <h1 class="main-title">Ekrandan Çık, Hayata Gir 🚀</h1>
+        <p class="main-subtitle">Bağımlılıklarından kurtul, gerçek potansiyelini keşfet</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-    st.markdown(
-        """
-        <h1 style='text-align: center; font-size: 2.4rem;'>
-        Ekrandan çıkışını değil,<br>
-        gerçek hayata girişini keşfet 🚀
-        </h1>
-        """,
-        unsafe_allow_html=True
-    )
+    # Sloganlar bölümü
+    st.markdown("---")
+    
+    slogans = [
+        {
+            "title": "💪 Güçlü Bir Sen",
+            "text": "Her gün bir adım at, bağımlılıklarının esiri olma. Sen kontrol sende!"
+        },
+        {
+            "title": "🎯 Hedefine Odaklan",
+            "text": "Ekran başında geçen her saat, hayallerinden çalınan bir saattir."
+        },
+        {
+            "title": "🌅 Yeni Bir Başlangıç",
+            "text": "Bugün bırak, yarın özgür ol. Bağımlılık zincirlerini kır!"
+        },
+        {
+            "title": "🧠 Zihnini Özgürleştir",
+            "text": "Teknoloji sana hizmet etsin, sen teknolojiye değil."
+        },
+        {
+            "title": "❤️ Gerçek Bağlantılar",
+            "text": "Sanal dünyada kaybolma, gerçek ilişkiler kur."
+        },
+        {
+            "title": "🌟 Parlak Gelecek",
+            "text": "Her bağımlılıktan kurtuluş, yeni bir hayatın başlangıcıdır."
+        },
+        {
+            "title": "🏃‍♂️ Harekete Geç",
+            "text": "Düşünme, yap! Alışkanlıklarını değiştir, hayatın değişsin."
+        },
+        {
+            "title": "🔓 Özgürlüğe Giden Yol",
+            "text": "Bağımlılık bir kafestir. Anahtar senin elinde."
+        }
+    ]
 
-    st.markdown(
-        """
-        <p style='text-align: center; font-size: 1.2rem; color: #555;'>
-        Alışkanlıklarını dönüştür, karakterini güçlendir.
-        </p>
-        """,
-        unsafe_allow_html=True
-    )
+    for i, slogan in enumerate(slogans):
+        colors = ["#f0f8ff", "#f5f5f5", "#e8f5e9", "#fff3e0", "#fce4ec", "#e0f7fa", "#f1f8e9", "#ede7f6"]
+        bg_color = colors[i % len(colors)]
+        
+        st.markdown(f"""
+        <div class="slogan-section" style="background-color: {bg_color};">
+            <div class="slogan-title">{slogan['title']}</div>
+            <div class="slogan-text">"{slogan['text']}"</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("")
+
+    # Alt bilgi
+    st.markdown("---")
+    st.markdown("""
+    <div style="text-align: center; padding: 20px; color: #666;">
+        <p>🌱 Her gün yeni bir başlangıçtır. Şimdi başla!</p>
+        <p style="font-size: 0.9rem;">Karakter & Alışkanlık Koçu ile hayatını dönüştür</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ============================================================
