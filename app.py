@@ -400,6 +400,9 @@ if "current_chat_id" not in st.session_state:
 if "show_auth_modal" not in st.session_state:
     st.session_state.show_auth_modal = False
 
+if "auth_tab" not in st.session_state:
+    st.session_state.auth_tab = "login"  # "login" veya "register"
+
 if "gun_sayisi" not in st.session_state:
     st.session_state.gun_sayisi = 1
 
@@ -572,11 +575,13 @@ if not st.session_state.user:
     with col_login:
         if st.button("🔑 Giriş Yap", use_container_width=True):
             st.session_state.show_auth_modal = True
+            st.session_state.auth_tab = "login"
             st.rerun()
 
     with col_register:
         if st.button("📝 Üye Ol", type="primary", use_container_width=True):
             st.session_state.show_auth_modal = True
+            st.session_state.auth_tab = "register"
             st.rerun()
 
     # Giriş modal'ı
@@ -591,7 +596,11 @@ if not st.session_state.user:
 
             else:
 
-                tab_login, tab_register = st.tabs(["🔑 Giriş Yap", "📝 Kayıt Ol"])
+                # Sekmeleri oluştur ve doğru sekmeyi aktif et
+                if st.session_state.auth_tab == "register":
+                    tab_login, tab_register = st.tabs(["🔑 Giriş Yap", "📝 Kayıt Ol"])
+                else:
+                    tab_login, tab_register = st.tabs(["🔑 Giriş Yap", "📝 Kayıt Ol"])
 
                 with tab_login:
 
