@@ -511,7 +511,13 @@ if not st.session_state.user:
         border-radius: 15px;
         text-align: center;
         opacity: 0;
-        animation: fadeInUp 0.7s ease-out forwards;
+        transform: translateY(40px);
+        transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+    }
+    
+    .slogan-card.visible {
+        opacity: 1;
+        transform: translateY(0);
     }
     
     .slogan-card h2 {
@@ -524,17 +530,6 @@ if not st.session_state.user:
         font-size: 1.2rem;
         line-height: 1.6;
         font-style: italic;
-    }
-    
-    @keyframes fadeInUp {
-        from {
-            opacity: 0;
-            transform: translateY(40px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
     }
     
     .color-1 { background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%); }
@@ -562,6 +557,38 @@ if not st.session_state.user:
     .color-8 h2, .color-8 p { color: #333; }
     </style>
     """, unsafe_allow_html=True)
+
+    # JavaScript: scroll ile görünürlüğü algıla ve .visible ekle
+    components.html("""
+    <script>
+    (function() {
+        function handleScroll() {
+            var cards = document.querySelectorAll('.slogan-card');
+            var windowHeight = window.innerHeight;
+            
+            cards.forEach(function(card) {
+                if (!card.classList.contains('visible')) {
+                    var rect = card.getBoundingClientRect();
+                    if (rect.top < windowHeight * 0.85) {
+                        card.classList.add('visible');
+                    }
+                }
+            });
+        }
+        
+        // İlk yüklemede ve scroll sırasında kontrol et
+        window.addEventListener('scroll', handleScroll);
+        window.addEventListener('load', handleScroll);
+        document.addEventListener('DOMContentLoaded', function() {
+            handleScroll();
+        });
+        
+        // Biraz gecikmeli tekrar kontrol (Streamlit render sonrası)
+        setTimeout(handleScroll, 1000);
+        setTimeout(handleScroll, 3000);
+    })();
+    </script>
+    """, height=0, width=0)
 
     # Üst menü
     col_logo, col_space, col_login, col_register = st.columns([3, 4, 1.5, 1.5])
@@ -709,61 +736,53 @@ if not st.session_state.user:
     </div>
     """, unsafe_allow_html=True)
 
-    # Slogan kartları
+    # Slogan kartları (başlangıçta gizli, scroll ile görünür olacak)
     slogans = [
         {
             "title": "💪 Güçlü Bir Sen",
             "text": "Her gün bir adım at, bağımlılıklarının esiri olma. Sen kontrol sende!",
-            "color": "color-1",
-            "delay": "0.2s"
+            "color": "color-1"
         },
         {
             "title": "🎯 Hedefine Odaklan",
             "text": "Ekran başında geçen her saat, hayallerinden çalınan bir saattir.",
-            "color": "color-2",
-            "delay": "0.5s"
+            "color": "color-2"
         },
         {
             "title": "🌅 Yeni Bir Başlangıç",
             "text": "Bugün bırak, yarın özgür ol. Bağımlılık zincirlerini kır!",
-            "color": "color-3",
-            "delay": "0.8s"
+            "color": "color-3"
         },
         {
             "title": "🧠 Zihnini Özgürleştir",
             "text": "Teknoloji sana hizmet etsin, sen teknolojiye değil.",
-            "color": "color-4",
-            "delay": "1.1s"
+            "color": "color-4"
         },
         {
             "title": "❤️ Gerçek Bağlantılar",
             "text": "Sanal dünyada kaybolma, gerçek ilişkiler kur.",
-            "color": "color-5",
-            "delay": "1.4s"
+            "color": "color-5"
         },
         {
             "title": "🌟 Parlak Gelecek",
             "text": "Her bağımlılıktan kurtuluş, yeni bir hayatın başlangıcıdır.",
-            "color": "color-6",
-            "delay": "1.7s"
+            "color": "color-6"
         },
         {
             "title": "🏃‍♂️ Harekete Geç",
             "text": "Düşünme, yap! Alışkanlıklarını değiştir, hayatın değişsin.",
-            "color": "color-7",
-            "delay": "2.0s"
+            "color": "color-7"
         },
         {
             "title": "🔓 Özgürlüğe Giden Yol",
             "text": "Bağımlılık bir kafestir. Anahtar senin elinde.",
-            "color": "color-8",
-            "delay": "2.3s"
+            "color": "color-8"
         }
     ]
 
     for slogan in slogans:
         st.markdown(f"""
-        <div class="slogan-card {slogan['color']}" style="animation-delay: {slogan['delay']};">
+        <div class="slogan-card {slogan['color']}">
             <h2>{slogan['title']}</h2>
             <p>"{slogan['text']}"</p>
         </div>
