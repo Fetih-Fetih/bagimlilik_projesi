@@ -201,7 +201,22 @@ def upload_avatar(user_id: str, uploaded_file) -> str | None:
         st.error("Veri tabanı bağlantısı kurulamadı.")
         return None
 
+    access_token = st.session_state.get("access_token")
+    refresh_token = st.session_state.get("refresh_token")
+
+    if not access_token or not refresh_token:
+
+        st.error(
+            "Oturum süresi dolmuş. Lütfen çıkış yapıp tekrar giriş yap."
+        )
+
+        return None
+
     try:
+
+        # Storage isteğinin RLS politikalarını geçebilmesi için
+        # önce oturumu (kullanıcı kimliğini) client'a yüklüyoruz.
+        supabase.auth.set_session(access_token, refresh_token)
 
         ext = uploaded_file.name.split(".")[-1].lower()
         path = f"{user_id}/avatar.{ext}"
