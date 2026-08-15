@@ -159,6 +159,23 @@ def inject_location_request() -> None:
 
 EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
+TURKISH_CITIES = [
+    "Adana", "Adıyaman", "Afyonkarahisar", "Ağrı", "Aksaray", "Amasya",
+    "Ankara", "Antalya", "Ardahan", "Artvin", "Aydın", "Balıkesir",
+    "Bartın", "Batman", "Bayburt", "Bilecik", "Bingöl", "Bitlis",
+    "Bolu", "Burdur", "Bursa", "Çanakkale", "Çankırı", "Çorum",
+    "Denizli", "Diyarbakır", "Düzce", "Edirne", "Elazığ", "Erzincan",
+    "Erzurum", "Eskişehir", "Gaziantep", "Giresun", "Gümüşhane",
+    "Hakkari", "Hatay", "Iğdır", "Isparta", "İstanbul", "İzmir",
+    "Kahramanmaraş", "Karabük", "Karaman", "Kars", "Kastamonu",
+    "Kayseri", "Kırıkkale", "Kırklareli", "Kırşehir", "Kilis",
+    "Kocaeli", "Konya", "Kütahya", "Malatya", "Manisa", "Mardin",
+    "Mersin", "Muğla", "Muş", "Nevşehir", "Niğde", "Ordu",
+    "Osmaniye", "Rize", "Sakarya", "Samsun", "Siirt", "Sinop",
+    "Sivas", "Şanlıurfa", "Şırnak", "Tekirdağ", "Tokat", "Trabzon",
+    "Tunceli", "Uşak", "Van", "Yalova", "Yozgat", "Zonguldak"
+]
+
 
 def is_valid_email(email: str) -> bool:
     return bool(EMAIL_REGEX.match(email or ""))
@@ -237,7 +254,8 @@ def load_chats_from_db(user_id: str) -> dict:
             }
 
     except Exception as e:
-        st.warning(f"Sohbet geçmişi yüklenirken hata oluştu: {e}")
+        error_detail = getattr(e, 'message', str(e))
+        st.warning(f"Sohbet geçmişi yüklenirken hata oluştu: {error_detail}")
 
     return chats
 
@@ -252,10 +270,15 @@ def create_chat_in_db(user_id: str, title: str) -> str:
             .insert({"user_id": user_id, "title": title})
             .execute()
         )
-        return result.data[0]["id"]
+        
+        if result.data:
+            return result.data[0]["id"]
+        else:
+            return str(uuid.uuid4())
 
     except Exception as e:
-        st.warning(f"Sohbet veritabanına kaydedilemedi: {e}")
+        error_detail = getattr(e, 'message', str(e))
+        st.error(f"Sohbet oluşturulamadı: {error_detail}")
         return str(uuid.uuid4())
 
 
@@ -264,6 +287,18 @@ def save_message_to_db(chat_id: str, role: str, content: str) -> None:
         return
 
     try:
+        # Önce sohbetin gerçekten bu kullanıcıya ait olduğunu kontrol et
+        chat_check = (
+            supabase.table("chats")
+            .select("user_id")
+            .eq("id", chat_id)
+            .eq("user_id", st.session_state.user.id)
+            .execute()
+        )
+
+        if not chat_check.data:
+            return
+
         supabase.table("messages").insert(
             {"chat_id": chat_id, "role": role, "content": content}
         ).execute()
@@ -273,7 +308,8 @@ def save_message_to_db(chat_id: str, role: str, content: str) -> None:
         ).eq("id", chat_id).execute()
 
     except Exception as e:
-        st.warning(f"Mesaj veritabanına kaydedilemedi: {e}")
+        error_detail = getattr(e, 'message', str(e))
+        st.error(f"Mesaj kaydedilemedi: {error_detail}")
 
 
 def upload_avatar(user_id: str, uploaded_file) -> str | None:
@@ -385,6 +421,15 @@ if "avatar_url" not in st.session_state:
 
 if "city" not in st.session_state:
     st.session_state.city = None
+
+if "city_confirmed" not in st.session_state:
+    st.session_state.city_confirmed = False
+
+if "detected_city" not in st.session_state:
+    st.session_state.detected_city = None
+
+if "manual_selection" not in st.session_state:
+    st.session_state.manual_selection = False
 
 
 # ============================================================
@@ -604,7 +649,9 @@ else:
         if lat and lon:
             try:
                 city = reverse_geocode(float(lat), float(lon))
+                st.session_state.detected_city = city
                 st.session_state.city = city
+                st.session_state.city_confirmed = False
                 st.session_state.sayfa = "📍 Şehrimdeki Etkinlikler"
             except Exception as e:
                 st.warning(f"Konum şehre çevrilemedi: {e}")
@@ -1006,64 +1053,24 @@ else:
 
         st.title("📍 Şehrimdeki Etkinlikler")
 
+        # ----------------------------------------------------
+        # ŞEHİR BELİRLENMEMİŞSE
+        # ----------------------------------------------------
         if not st.session_state.city:
             st.info("Şehrindeki etkinlikleri görmek için konum izni vermen gerekiyor.")
 
-            if st.button("📍 Konumumu Kullan", type="primary", use_container_width=True):
-                inject_location_request()
-                st.stop()
+            col_loc_btn, col_manual_btn = st.columns(2)
 
-            st.caption(
-                "Konum bilgisi yalnızca şehrini belirlemek için kullanılır. "
-                "Sunucuya kaydedilmez."
-            )
+            with col_loc_btn:
+                if st.button("📍 Konumumu Kullan", type="primary", use_container_width=True):
+                    inject_location_request()
+                    st.stop()
 
-        else:
-            st.success(f"📍 Şehir: **{st.session_state.city}**")
+            with col_manual_btn:
+                if st.button("🗺️ Manuel Seç", use_container_width=True):
+                    st.session_state.manual_selection = True
+                    st.rerun()
 
-            if st.button("🔄 Etkinlikleri Yenile", use_container_width=True):
-                st.rerun()
-
-            GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "").strip()
-
-            if not GROQ_API_KEY:
-                st.error("GROQ_API_KEY bulunamadı.")
-
-            else:
-                client = Groq(api_key=GROQ_API_KEY)
-
-                prompt = f"""
-                Sen bir yerel etkinlik rehberisin.
-
-                {st.session_state.city} şehrinde önümüzdeki 7 gün içinde
-                gerçekleşebilecek etkinlikleri öner.
-
-                Konser, sergi, tiyatro, festival, spor, atölye, doğa gezisi
-                gibi kategorilerde öneriler sun.
-
-                Eğer kesin tarihli güncel etkinlik bilmiyorsan, bu şehirde
-                her hafta düzenlenen popüler etkinlikleri, mekanları ve
-                kültürel noktaları öner.
-
-                Türkçe, markdown formatında, emojiler kullanarak düzenli
-                bir liste hazırla.
-                """
-
-                with st.spinner("Etkinlikler hazırlanıyor..."):
-                    try:
-                        chat_completion = client.chat.completions.create(
-                            messages=[{"role": "user", "content": prompt}],
-                            model="llama-3.3-70b-versatile"
-                        )
-
-                        ai_events = chat_completion.choices[0].message.content
-                        st.markdown(ai_events)
-
-                    except Exception as e:
-                        st.error(f"Etkinlik önerileri alınamadı: {e}")
-
-                st.caption(
-                    "Not: Bu etkinlik önerileri yapay zekâ tarafından "
-                    "oluşturulmuştur. Güncel ve kesin bilgi için resmî "
-                    "etkinlik sitelerini kontrol et."
-                )
+            # Manuel seçim aktifse şehir listesini göster
+            if st.session_state.get("manual_selection", False):
+                st.markdown("
