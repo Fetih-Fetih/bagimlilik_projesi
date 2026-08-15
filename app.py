@@ -639,9 +639,7 @@ else:
     user_email = st.session_state.user.email
     display_name = st.session_state.get("profile_name", user_email.split("@")[0])
 
-    # ====================================================
     # KONUMDAN GELEN LAT/LON VARSA ŞEHRE ÇEVİR
-    # ====================================================
     if "lat" in st.query_params and "lon" in st.query_params:
         lat = st.query_params.get("lat")
         lon = st.query_params.get("lon")
@@ -692,10 +690,7 @@ else:
                 st.session_state.clear()
                 st.rerun()
 
-    # ====================================================
     # MENÜ
-    # ====================================================
-
     col_menu, col_space = st.columns([1.5, 6])
 
     with col_menu:
@@ -1053,9 +1048,7 @@ else:
 
         st.title("📍 Şehrimdeki Etkinlikler")
 
-        # ----------------------------------------------------
         # ŞEHİR BELİRLENMEMİŞSE
-        # ----------------------------------------------------
         if not st.session_state.city:
             st.info("Şehrindeki etkinlikleri görmek için konum izni vermen gerekiyor.")
 
@@ -1071,6 +1064,116 @@ else:
                     st.session_state.manual_selection = True
                     st.rerun()
 
-            # Manuel seçim aktifse şehir listesini göster
             if st.session_state.get("manual_selection", False):
-                st.markdown("
+                st.markdown("---")
+                st.subheader("Şehir Seçin")
+
+                selected_city = st.selectbox(
+                    "81 ilden birini seçin",
+                    TURKISH_CITIES,
+                    key="manual_city_select"
+                )
+
+                if st.button("✅ Bu Şehri Kullan", type="primary", use_container_width=True):
+                    st.session_state.city = selected_city
+                    st.session_state.city_confirmed = True
+                    st.session_state.manual_selection = False
+                    st.rerun()
+
+            st.caption(
+                "Konum bilgisi yalnızca şehrini belirlemek için kullanılır. "
+                "Sunucuya kaydedilmez."
+            )
+
+        # ŞEHİR BELİRLENDİ AMA HENÜZ ONAYLANMADI
+        elif not st.session_state.city_confirmed:
+            st.info(f"📍 Konumunuza göre şehriniz: **{st.session_state.detected_city}**")
+
+            col_confirm, col_change = st.columns(2)
+
+            with col_confirm:
+                if st.button("✅ Evet, doğru", type="primary", use_container_width=True):
+                    st.session_state.city = st.session_state.detected_city
+                    st.session_state.city_confirmed = True
+                    st.rerun()
+
+            with col_change:
+                if st.button("❌ Hayır, değiştir", use_container_width=True):
+                    st.session_state.city = None
+                    st.session_state.detected_city = None
+                    st.session_state.manual_selection = True
+                    st.rerun()
+
+            if st.session_state.get("manual_selection", False):
+                st.markdown("---")
+                st.subheader("Şehir Seçin")
+
+                selected_city = st.selectbox(
+                    "81 ilden birini seçin",
+                    TURKISH_CITIES,
+                    key="manual_city_select_2"
+                )
+
+                if st.button("✅ Bu Şehri Kullan", type="primary", use_container_width=True):
+                    st.session_state.city = selected_city
+                    st.session_state.city_confirmed = True
+                    st.session_state.manual_selection = False
+                    st.rerun()
+
+        # ŞEHİR ONAYLANDI, ETKİNLİKLERİ GÖSTER
+        else:
+            st.success(f"📍 Şehir: **{st.session_state.city}**")
+
+            if st.button("🔄 Şehir Değiştir", use_container_width=True):
+                st.session_state.city = None
+                st.session_state.detected_city = None
+                st.session_state.city_confirmed = False
+                st.session_state.manual_selection = False
+                st.rerun()
+
+            if st.button("🔄 Etkinlikleri Yenile", use_container_width=True):
+                st.rerun()
+
+            GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "").strip()
+
+            if not GROQ_API_KEY:
+                st.error("GROQ_API_KEY bulunamadı.")
+
+            else:
+                client = Groq(api_key=GROQ_API_KEY)
+
+                prompt = f"""
+                Sen bir yerel etkinlik rehberisin.
+
+                {st.session_state.city} şehrinde önümüzdeki 7 gün içinde
+                gerçekleşebilecek etkinlikleri öner.
+
+                Konser, sergi, tiyatro, festival, spor, atölye, doğa gezisi
+                gibi kategorilerde öneriler sun.
+
+                Eğer kesin tarihli güncel etkinlik bilmiyorsan, bu şehirde
+                her hafta düzenlenen popüler etkinlikleri, mekanları ve
+                kültürel noktaları öner.
+
+                Türkçe, markdown formatında, emojiler kullanarak düzenli
+                bir liste hazırla.
+                """
+
+                with st.spinner("Etkinlikler hazırlanıyor..."):
+                    try:
+                        chat_completion = client.chat.completions.create(
+                            messages=[{"role": "user", "content": prompt}],
+                            model="llama-3.3-70b-versatile"
+                        )
+
+                        ai_events = chat_completion.choices[0].message.content
+                        st.markdown(ai_events)
+
+                    except Exception as e:
+                        st.error(f"Etkinlik önerileri alınamadı: {e}")
+
+                st.caption(
+                    "Not: Bu etkinlik önerileri yapay zekâ tarafından "
+                    "oluşturulmuştur. Güncel ve kesin bilgi için resmî "
+                    "etkinlik sitelerini kontrol et."
+                )
