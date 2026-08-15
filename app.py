@@ -10,15 +10,25 @@ st.set_page_config(
     page_title="Alışkanlık Asistanı", 
     page_icon="🌱", 
     layout="wide",
-    initial_sidebar_state="expanded" # Otomatik açılır/kapanır kenar çubuğu
+    initial_sidebar_state="collapsed"
 )
 
 # CSS Tasarımları
 st.markdown("""
     <style>
     footer {visibility: hidden;}
-    header {visibility: hidden;}
     .stButton>button { width: 100%; }
+    
+    /* Sol üstteki Yeşil Menü Kutusu */
+    div[data-testid="stColumn"] button[key="btn_toggle_sidebar"] {
+        background-color: #2e7d32 !important;
+        color: #ffffff !important;
+        font-weight: bold !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 8px 16px !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+    }
     
     .chat-card {
         background-color: #f9f9f9;
@@ -44,7 +54,7 @@ def get_supabase_client():
 
 supabase = get_supabase_client()
 
-# --- 3. OTURUM KONTROLÜ ---
+# --- 3. OTURUM VE SESSION KONTROLÜ ---
 if "user" not in st.session_state:
     st.session_state.user = None
 
@@ -201,10 +211,16 @@ else:
     user_email = st.session_state.user.email
     display_name = st.session_state.profile_name if st.session_state.profile_name else user_email.split('@')[0]
     
-    # MENÜ (SIDEBAR) Doğrudan Tanımlama
+    # KULLANICININ İSTEDİĞİ ☰ Menü BUTONU
+    col_menu_btn, _ = st.columns([1.5, 6])
+    with col_menu_btn:
+        # Menü butonuna tıklandığında sidebar içeriğini görünür yapma/tetikleme
+        st.button("☰ Menü", key="btn_toggle_sidebar")
+
+    # YAN PANEL (SIDEBAR)
     with st.sidebar:
         st.title("📌 Menü")
-        st.write(f"Sistemdeki Kullanıcı: **{display_name}**")
+        st.write(f"Kullanıcı: **{display_name}**")
         st.divider()
 
         if st.button("⚙️ Profilimi Düzenle"):
