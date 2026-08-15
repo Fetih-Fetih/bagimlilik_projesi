@@ -367,12 +367,11 @@ if st.session_state.user is None and not st.session_state.get("auth_restore_done
                     apply_auth_session(res.user, res.session)
                     st.session_state.auto_restored_notice = True
 
-                    cookie_manager.set(
-                        AUTH_COOKIE_NAME,
-                        res.session.refresh_token,
-                        expires_at=datetime.utcnow() + timedelta(days=30),
-                        key="set_cookie_restore"
-                    )
+                    # Not: cookie_manager.set() hemen ardından st.rerun()
+                    # çağrılırsa tarayıcı çerezi kaydetmeye fırsat bulamıyor.
+                    # Bu yüzden token'ı bekletip asıl yazma işlemini
+                    # bir sonraki (rerun sonrası) normal render'da yapıyoruz.
+                    st.session_state.pending_remember_token = res.session.refresh_token
 
                     st.rerun()
 
@@ -482,17 +481,18 @@ if not st.session_state.user:
                                 apply_auth_session(res.user, res.session)
 
                                 # ---------------------------------
-                                # KALICI OTURUM İÇİN ÇEREZE YAZ
+                                # KALICI OTURUM İÇİN TOKEN'I BEKLET
                                 # (sadece "Bu cihazı hatırla" işaretliyse)
+                                # Gerçek çerez yazma işlemi, ana sayfa
+                                # normal şekilde render edilirken yapılır —
+                                # aksi halde st.rerun() tarayıcının çerezi
+                                # kaydetmesine fırsat vermeden sayfayı kesiyor.
                                 # ---------------------------------
 
                                 if res.session and remember_device:
 
-                                    cookie_manager.set(
-                                        AUTH_COOKIE_NAME,
-                                        res.session.refresh_token,
-                                        expires_at=datetime.utcnow() + timedelta(days=30),
-                                        key="set_cookie_login"
+                                    st.session_state.pending_remember_token = (
+                                        res.session.refresh_token
                                     )
 
                                 st.rerun()
@@ -611,6 +611,30 @@ else:
 
     user_email = st.session_state.user.email
     display_name = st.session_state.get("profile_name", user_email.split("@")[0])
+
+    # ========================================================
+    # BEKLEYEN "BU CİHAZI HATIRLA" ÇEREZİNİ ŞİMDİ YAZ
+    # ========================================================
+    # Bu, sayfa zorla yeniden başlatılmadan (st.rerun() olmadan) çalışan
+    # normal bir render turu olduğu için tarayıcı çerezi gerçekten kaydedebiliyor.
+
+    if st.session_state.get("pending_remember_token"):
+
+        token_to_save = st.session_state.pending_remember_token
+        st.session_state.pending_remember_token = None
+
+        try:
+
+            cookie_manager.set(
+                AUTH_COOKIE_NAME,
+                token_to_save,
+                expires_at=datetime.utcnow() + timedelta(days=30),
+                key="set_cookie_persist"
+            )
+
+        except Exception:
+
+            pass
 
     # ========================================================
     # OTOMATİK GİRİŞ UYARISI
