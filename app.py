@@ -1,16 +1,15 @@
 import streamlit as st
-import streamlit.components.v1 as components
 from supabase import create_client, Client
 from groq import Groq
 import uuid
-from datetime import datetime
+from datetime import datetime, date
 
 # --- 1. SAYFA AYARLARI ---
 st.set_page_config(
     page_title="Alışkanlık Asistanı",
     page_icon="🌱",
     layout="wide",
-    initial_sidebar_state="collapsed"   # kapalı başlasın
+    initial_sidebar_state="expanded"          # her zaman açık → stabil
 )
 
 # CSS
@@ -27,7 +26,7 @@ st.markdown("""
     .stButton>button { width: 100%; }
     
     /* Yeşil Menü butonu */
-    div[data-testid="stColumn"] button[key="btn_toggle_sidebar"] {
+    div[data-testid="stColumn"] button[key="btn_menu"] {
         background-color: #2e7d32 !important;
         color: #ffffff !important;
         font-weight: bold !important;
@@ -39,7 +38,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. SUPABASE CLIENT (CACHE YOK) ---
+# --- 2. SUPABASE CLIENT ---
 def get_supabase_client() -> Client | None:
     try:
         url = st.secrets.get("SUPABASE_URL", "").strip().rstrip("/")
@@ -166,7 +165,7 @@ if not st.session_state.user:
 
         st.divider()
 
-    # === ANA EKRAN SLOGANLARI (geri koyuldu) ===
+    # Ana ekran sloganları
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("<h1 style='text-align: center; font-size: 2.4rem;'>Ekrandan çıkışını değil,<br>gerçek hayata girişini keşfet 🚀</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; font-size: 1.2rem; color: #555;'>Alışkanlıklarını dönüştür, karakterini güçlendir.</p>", unsafe_allow_html=True)
@@ -176,38 +175,20 @@ else:
     user_email = st.session_state.user.email
     display_name = st.session_state.get("profile_name", user_email.split('@')[0])
 
-    # === MENÜ BUTONU ===
+    # Üstteki Menü butonu (görsel + sidebar'a dikkat çeker)
     col_menu_btn, _ = st.columns([1.4, 6])
     with col_menu_btn:
-        if st.button("☰ Menü", key="btn_toggle_sidebar"):
-            components.html("""
-                <script>
-                    const sidebar = window.parent.document.querySelector('section[data-testid="stSidebar"]');
-                    if (sidebar) {
-                        const isOpen = sidebar.offsetWidth > 50;
-                        if (isOpen) {
-                            sidebar.style.width = "0px";
-                            sidebar.style.minWidth = "0px";
-                            sidebar.style.transform = "translateX(-100%)";
-                            sidebar.setAttribute('aria-expanded', 'false');
-                        } else {
-                            sidebar.style.width = "21rem";
-                            sidebar.style.minWidth = "21rem";
-                            sidebar.style.transform = "none";
-                            sidebar.setAttribute('aria-expanded', 'true');
-                        }
-                    }
-                </script>
-            """, height=0, width=0)
+        st.button("☰ Menü", key="btn_menu")   # tıklanınca zaten sidebar açık
 
     # --- SIDEBAR ---
     with st.sidebar:
         st.title("📌 Menü")
-        st.write(f"Kullanıcı: **{display_name}**")
+        st.write(f"**{display_name}**")
         st.caption(user_email)
         st.divider()
 
-        if st.button("⚙️ Profilimi Düzenle"):
+        # Profil düzenle butonu
+        if st.button("⚙️ Profilimi Düzenle", use_container_width=True):
             st.session_state.sayfa = "👤 Profilim"
             st.rerun()
 
@@ -219,11 +200,13 @@ else:
             index=["🌱 AI Koç & Sohbet", "📊 İlerlemelerim", "📜 AI Geçmişim", "👤 Profilim"].index(st.session_state.sayfa),
             key="nav_radio"
         )
-        st.session_state.sayfa = secilen_sayfa
+        if secilen_sayfa != st.session_state.sayfa:
+            st.session_state.sayfa = secilen_sayfa
+            st.rerun()
 
         st.divider()
 
-        if st.button("🚪 Çıkış Yap", type="primary"):
+        if st.button("🚪 Çıkış Yap", type="primary", use_container_width=True):
             if supabase:
                 try:
                     supabase.auth.sign_out()
@@ -308,9 +291,62 @@ else:
                     for msg in chat["messages"]:
                         st.markdown(f"**{msg['role']}**: {msg['content']}")
 
+    # ========== PROFİL SAYFASI (DÜZENLEME FORMU VAR) ==========
     elif st.session_state.sayfa == "👤 Profilim":
         st.title("👤 Profilim")
-        st.write(f"**Ad Soyad:** {display_name}")
+        st.markdown("---")
+
+        with st.form("profile_form"):
+            st.subheader("Profil Bilgilerini Düzenle")
+
+            new_name = st.text_input("Ad Soyad", value=st.session_state.profile_name)
+            
+            # Doğum tarihi
+            try:
+                current_bdate = datetime.strptime(st.session_state.birth_date, "%Y-%m-%d").date()
+            except:
+                current_bdate = date(2000, 1, 1)
+            
+            new_bdate = st.date_input("Doğum Tarihi", value=current_bdate)
+            
+            gender_options = ["Kadın", "Erkek", "Belirtmek İstemiyorum"]
+            current_gender_idx = gender_options.index(st.session_state.gender) if st.session_state.gender in gender_options else 2
+            new_gender = st.selectbox("Cinsiyet", gender_options, index=current_gender_idx)
+
+            st.markdown("")
+            col_save, col_cancel = st.columns(2)
+            with col_save:
+                submitted = st.form_submit_button("💾 Kaydet", type="primary", use_container_width=True)
+            with col_cancel:
+                cancel = st.form_submit_button("İptal", use_container_width=True)
+
+            if submitted:
+                if not new_name.strip():
+                    st.error("Ad Soyad boş olamaz.")
+                else:
+                    try:
+                        # Supabase metadata güncelle
+                        supabase.auth.update_user({
+                            "data": {
+                                "full_name": new_name.strip(),
+                                "birth_date": str(new_bdate),
+                                "gender": new_gender
+                            }
+                        })
+                        
+                        # Session state'i de güncelle
+                        st.session_state.profile_name = new_name.strip()
+                        st.session_state.birth_date = str(new_bdate)
+                        st.session_state.gender = new_gender
+                        
+                        st.success("Profil başarıyla güncellendi!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Güncelleme hatası: {e}")
+
+            if cancel:
+                st.rerun()
+
+        st.markdown("---")
         st.write(f"**E-posta:** {user_email}")
-        st.write(f"**Doğum Tarihi:** {st.session_state.birth_date}")
-        st.write(f"**Cinsiyet:** {st.session_state.gender}")
+        st.caption("E-posta adresi değiştirilemez.")
