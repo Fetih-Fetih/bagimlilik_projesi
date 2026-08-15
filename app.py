@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 from supabase import create_client, Client
 from groq import Groq
 import base64
@@ -13,13 +14,22 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# CSS Tasarımları
+# Sol üstteki standart Streamlit okunu gizleme ve Özel Buton Tasarımı
 st.markdown("""
     <style>
     footer {visibility: hidden;}
+    
+    /* Streamlit'in kendi sol üst okunu gizle */
+    button[kind="header"] {
+        display: none !important;
+    }
+    [data-testid="stSidebarNav"] {
+        display: none !important;
+    }
+    
     .stButton>button { width: 100%; }
     
-    /* Sol üstteki Yeşil Menü Kutusu */
+    /* Sol üstteki Özel Yeşil Menü Kutusu */
     div[data-testid="stColumn"] button[key="btn_toggle_sidebar"] {
         background-color: #2e7d32 !important;
         color: #ffffff !important;
@@ -54,23 +64,19 @@ def get_supabase_client():
 
 supabase = get_supabase_client()
 
-# --- 3. OTURUM VE SESSION KONTROLÜ ---
+# --- 3. OTURUM VE SESSION TEMİZLİK KONTROLÜ ---
 if "user" not in st.session_state:
     st.session_state.user = None
 
-if supabase and not st.session_state.user:
-    try:
-        session = supabase.auth.get_session()
-        if session and session.user:
-            st.session_state.user = session.user
-            meta = session.user.user_metadata or {}
-            st.session_state.profile_name = meta.get("full_name", session.user.email.split('@')[0])
-            st.session_state.birth_date = meta.get("birth_date", "2000-01-01")
-            st.session_state.gender = meta.get("gender", "Belirtilmedi")
-    except Exception:
-        pass
+# Oturum Değişikliklerinde Veri Çakışmasını Önlemek İçin State Başlatıcı
+def reset_user_state():
+    st.session_state.chats = {}
+    st.session_state.current_chat_id = None
+    st.session_state.profile_name = ""
+    st.session_state.profile_pic = None
+    st.session_state.birth_date = "2000-01-01"
+    st.session_state.gender = "Belirtilmedi"
 
-# SOHBET VE DEĞİŞKEN MİMARİSİ
 if "chats" not in st.session_state:
     st.session_state.chats = {}
 
@@ -93,6 +99,19 @@ if "birth_date" not in st.session_state:
     st.session_state.birth_date = "2000-01-01"
 if "gender" not in st.session_state:
     st.session_state.gender = "Belirtilmedi"
+
+# Oturum Kontrolü (Giriş yapılmışsa bilgileri çek)
+if supabase and not st.session_state.user:
+    try:
+        session = supabase.auth.get_session()
+        if session and session.user:
+            st.session_state.user = session.user
+            meta = session.user.user_metadata or {}
+            st.session_state.profile_name = meta.get("full_name", session.user.email.split('@')[0])
+            st.session_state.birth_date = meta.get("birth_date", "2000-01-01")
+            st.session_state.gender = meta.get("gender", "Belirtilmedi")
+    except Exception:
+        pass
 
 # --- 4. GİRİŞ YAPILMAMIŞSA ---
 if not st.session_state.user:
@@ -136,6 +155,8 @@ if not st.session_state.user:
                                     "email": clean_email,
                                     "password": password
                                 })
+                                # Eski kullanıcı verilerini sıfırla ve yeni kullanıcıyı yükle
+                                reset_user_state()
                                 st.session_state.user = res.user
                                 meta = res.user.user_metadata or {}
                                 st.session_state.profile_name = meta.get("full_name", clean_email.split('@')[0])
@@ -181,6 +202,7 @@ if not st.session_state.user:
                                         }
                                     }
                                 })
+                                reset_user_state()
                                 st.session_state.profile_name = reg_name
                                 st.session_state.birth_date = str(reg_bdate)
                                 st.session_state.gender = reg_gender
@@ -211,11 +233,25 @@ else:
     user_email = st.session_state.user.email
     display_name = st.session_state.profile_name if st.session_state.profile_name else user_email.split('@')[0]
     
-    # KULLANICININ İSTEDİĞİ ☰ Menü BUTONU
+    # "☰ Menü" Butonuna Basıldığında Sidebar'ı Açan JS Tetikleyici
     col_menu_btn, _ = st.columns([1.5, 6])
     with col_menu_btn:
-        # Menü butonuna tıklandığında sidebar içeriğini görünür yapma/tetikleme
-        st.button("☰ Menü", key="btn_toggle_sidebar")
+        if st.button("☰ Menü", key="btn_toggle_sidebar"):
+            components.html("""
+                <script>
+                    var sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
+                    if (sidebar) {
+                        var isCollapsed = sidebar.getAttribute('aria-expanded') === 'false';
+                        if (isCollapsed) {
+                            sidebar.setAttribute('aria-expanded', 'true');
+                            sidebar.style.display = 'block';
+                        } else {
+                            sidebar.setAttribute('aria-expanded', 'false');
+                            sidebar.style.display = 'none';
+                        }
+                    }
+                </script>
+            """, height=0, width=0)
 
     # YAN PANEL (SIDEBAR)
     with st.sidebar:
@@ -242,8 +278,7 @@ else:
             if supabase:
                 supabase.auth.sign_out()
             st.session_state.user = None
-            st.session_state.chats = {}
-            st.session_state.current_chat_id = None
+            reset_user_state()
             st.rerun()
 
     # --- SAYFA: PROFİLİM ---
