@@ -50,6 +50,12 @@ section[data-testid="stSidebar"] {
     border-radius: 8px;
 }
 
+.avatar-circle {
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -550,7 +556,11 @@ else:
 
             if st.session_state.avatar_url:
 
-                st.image(st.session_state.avatar_url, width=64)
+                st.markdown(
+                    f'<img src="{st.session_state.avatar_url}" '
+                    f'class="avatar-circle" width="64" height="64">',
+                    unsafe_allow_html=True
+                )
 
             st.write(f"**{display_name}**")
             st.caption(user_email)
@@ -806,7 +816,11 @@ else:
 
             if st.session_state.avatar_url:
 
-                st.image(st.session_state.avatar_url, width=120)
+                st.markdown(
+                    f'<img src="{st.session_state.avatar_url}" '
+                    f'class="avatar-circle" width="120" height="120">',
+                    unsafe_allow_html=True
+                )
 
             else:
 
