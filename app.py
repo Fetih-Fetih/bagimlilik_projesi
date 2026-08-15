@@ -1,7 +1,7 @@
 import streamlit as st
+import streamlit.components.v1 as components
 from supabase import create_client, Client
 from groq import Groq
-import extra_streamlit_components as stx
 import uuid
 import re
 from datetime import datetime, date, timedelta
@@ -86,17 +86,61 @@ supabase = get_supabase_client()
 
 
 # ============================================================
-# 3B. TARAYICI ÇEREZ YÖNETİCİSİ (kalıcı oturum için)
+# 3B. TARAYICI ÇEREZİ (kalıcı oturum için, saf JS ile)
 # ============================================================
+# extra_streamlit_components gibi çift yönlü custom component'ler bu
+# senaryoda güvenilmez senkronize oluyor. Bunun yerine:
+#   - Çerez YAZMA: components.html ile doğrudan JS enjekte ediyoruz.
+#   - Çerez OKUMA: sayfa yüklendiğinde JS çerezi kontrol edip varsa
+#     URL'e query parametresi olarak ekleyip sayfayı yeniden yüklüyor;
+#     Python tarafı bu parametreyi st.query_params ile okuyor.
 
 AUTH_COOKIE_NAME = "habit_coach_refresh_token"
+AUTH_QUERY_PARAM = "auth_token"
 
 
-def get_cookie_manager() -> stx.CookieManager:
-    return stx.CookieManager(key="cookie_manager_main")
+def set_browser_cookie(name: str, value: str, days: int = 30) -> None:
+    """Tarayıcıya doğrudan JS ile kalıcı çerez yazar."""
+
+    js = f"""
+    <script>
+    document.cookie = "{name}={value}; max-age={days * 24 * 60 * 60}; path=/; SameSite=Lax";
+    </script>
+    """
+
+    components.html(js, height=0, width=0)
 
 
-cookie_manager = get_cookie_manager()
+def delete_browser_cookie(name: str) -> None:
+    """Tarayıcıdaki çerezi siler."""
+
+    js = f"""
+    <script>
+    document.cookie = "{name}=; max-age=0; path=/; SameSite=Lax";
+    </script>
+    """
+
+    components.html(js, height=0, width=0)
+
+
+def inject_cookie_check_redirect(name: str, query_param: str) -> None:
+    """Sayfa ilk açıldığında çerezde token varsa ve URL'de henüz yoksa,
+    token'ı URL'e ekleyip sayfayı yeniden yükler (Python bunu okuyabilsin diye)."""
+
+    js = f"""
+    <script>
+    (function() {{
+        var match = document.cookie.match(new RegExp('(^| )' + '{name}' + '=([^;]+)'));
+        var params = new URLSearchParams(window.location.search);
+        if (match && !params.has('{query_param}')) {{
+            params.set('{query_param}', match[2]);
+            window.location.search = params.toString();
+        }}
+    }})();
+    </script>
+    """
+
+    components.html(js, height=0, width=0)
 
 
 # ============================================================
@@ -348,42 +392,46 @@ if "avatar_url" not in st.session_state:
 
 if st.session_state.user is None and not st.session_state.get("auth_restore_done", False):
 
-    cookies = cookie_manager.get_all()
+    token_from_url = st.query_params.get(AUTH_QUERY_PARAM)
 
-    if cookies is not None:
+    if token_from_url:
 
+        # Aynı token ile tekrar tekrar denemeyelim (örn. token geçersizse
+        # sonsuz döngüye girmesin diye) bir defalık işaretliyoruz.
         st.session_state.auth_restore_done = True
 
-        saved_refresh_token = cookies.get(AUTH_COOKIE_NAME)
-
-        if saved_refresh_token and supabase:
+        if supabase:
 
             try:
 
-                res = supabase.auth.refresh_session(saved_refresh_token)
+                res = supabase.auth.refresh_session(token_from_url)
 
                 if res and res.user and res.session:
 
                     apply_auth_session(res.user, res.session)
                     st.session_state.auto_restored_notice = True
 
-                    # Not: cookie_manager.set() hemen ardından st.rerun()
-                    # çağrılırsa tarayıcı çerezi kaydetmeye fırsat bulamıyor.
-                    # Bu yüzden token'ı bekletip asıl yazma işlemini
-                    # bir sonraki (rerun sonrası) normal render'da yapıyoruz.
+                    # Yeni (rotate edilmiş) refresh token'ı normal render
+                    # sırasında (rerun'dan hemen önce değil) çereze yazacağız.
                     st.session_state.pending_remember_token = res.session.refresh_token
-
-                    st.rerun()
 
             except Exception:
 
-                try:
+                delete_browser_cookie(AUTH_COOKIE_NAME)
 
-                    cookie_manager.delete(AUTH_COOKIE_NAME, key="delete_cookie_restore")
+        # Token'ı adres çubuğundan temizle (orada kalmasın).
+        st.query_params.clear()
+        st.rerun()
 
-                except Exception:
+    else:
 
-                    pass
+        # Çerezde token var mı diye bir kere kontrol et; varsa URL'e
+        # ekleyip sayfayı otomatik yeniden yükleyecek.
+        if not st.session_state.get("cookie_check_injected", False):
+
+            st.session_state.cookie_check_injected = True
+
+            inject_cookie_check_redirect(AUTH_COOKIE_NAME, AUTH_QUERY_PARAM)
 
 
 # ============================================================
@@ -623,18 +671,7 @@ else:
         token_to_save = st.session_state.pending_remember_token
         st.session_state.pending_remember_token = None
 
-        try:
-
-            cookie_manager.set(
-                AUTH_COOKIE_NAME,
-                token_to_save,
-                expires_at=datetime.utcnow() + timedelta(days=30),
-                key="set_cookie_persist"
-            )
-
-        except Exception:
-
-            pass
+        set_browser_cookie(AUTH_COOKIE_NAME, token_to_save, days=30)
 
     # ========================================================
     # OTOMATİK GİRİŞ UYARISI
@@ -672,7 +709,7 @@ else:
 
                 try:
 
-                    cookie_manager.delete(AUTH_COOKIE_NAME, key="delete_cookie_notice")
+                    delete_browser_cookie(AUTH_COOKIE_NAME)
 
                 except Exception:
 
@@ -752,7 +789,7 @@ else:
 
                 try:
 
-                    cookie_manager.delete(AUTH_COOKIE_NAME, key="delete_cookie_logout")
+                    delete_browser_cookie(AUTH_COOKIE_NAME)
 
                 except Exception:
 
