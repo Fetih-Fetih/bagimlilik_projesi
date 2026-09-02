@@ -408,6 +408,9 @@ if "current_chat_id" not in st.session_state:
 if "show_auth_modal" not in st.session_state:
     st.session_state.show_auth_modal = False
 
+if "auth_mode" not in st.session_state:
+    st.session_state.auth_mode = "login"
+
 if "gun_sayisi" not in st.session_state:
     st.session_state.gun_sayisi = 1
 
@@ -527,6 +530,7 @@ if not st.session_state.user:
         if st.button("🔑 Giriş Yap", use_container_width=True):
 
             st.session_state.show_auth_modal = True
+            st.session_state.auth_mode = "login"
             st.rerun()
 
     with col_register:
@@ -534,6 +538,7 @@ if not st.session_state.user:
         if st.button("📝 Üye Ol", type="primary", use_container_width=True):
 
             st.session_state.show_auth_modal = True
+            st.session_state.auth_mode = "register"
             st.rerun()
 
     st.divider()
@@ -554,13 +559,39 @@ if not st.session_state.user:
 
             else:
 
-                tab_login, tab_register = st.tabs(["🔑 Giriş Yap", "📝 Kayıt Ol"])
+                seg_login, seg_register = st.columns(2)
+
+                with seg_login:
+
+                    if st.button(
+                        "🔑 Giriş Yap",
+                        key="seg_login_btn",
+                        type="primary" if st.session_state.auth_mode == "login" else "secondary",
+                        use_container_width=True
+                    ):
+
+                        st.session_state.auth_mode = "login"
+                        st.rerun()
+
+                with seg_register:
+
+                    if st.button(
+                        "📝 Kayıt Ol",
+                        key="seg_register_btn",
+                        type="primary" if st.session_state.auth_mode == "register" else "secondary",
+                        use_container_width=True
+                    ):
+
+                        st.session_state.auth_mode = "register"
+                        st.rerun()
+
+                st.markdown("")
 
                 # =================================================
                 # GİRİŞ
                 # =================================================
 
-                with tab_login:
+                if st.session_state.auth_mode == "login":
 
                     email = st.text_input("E-Posta Adresi", key="l_email")
                     password = st.text_input("Şifre", type="password", key="l_pass")
@@ -629,7 +660,7 @@ if not st.session_state.user:
                 # KAYIT
                 # =================================================
 
-                with tab_register:
+                if st.session_state.auth_mode == "register":
 
                     reg_name = st.text_input("Ad Soyad", key="r_name")
                     reg_email = st.text_input("E-Posta Adresi", key="r_email")
@@ -689,7 +720,7 @@ if not st.session_state.user:
 
                             try:
 
-                                supabase.auth.sign_up(
+                                signup_res = supabase.auth.sign_up(
                                     {
                                         "email": reg_email.strip().lower(),
                                         "password": reg_pass,
@@ -705,11 +736,37 @@ if not st.session_state.user:
                                     }
                                 )
 
-                                st.success("Kayıt başarılı! Giriş yapabilirsiniz.")
+                                # Supabase, e-posta zaten kayıtlıysa hata fırlatmak
+                                # yerine (kullanıcı numarasını sızdırmamak için)
+                                # boş bir "identities" listesiyle dönüyor. Bunu
+                                # kontrol ederek kullanıcıya net bir mesaj veriyoruz.
+                                identities = getattr(signup_res.user, "identities", None)
+
+                                if signup_res.user and identities is not None and len(identities) == 0:
+
+                                    st.warning(
+                                        "Bu e-posta adresi zaten kayıtlı. "
+                                        "Giriş yapmayı dener misin?"
+                                    )
+
+                                else:
+
+                                    st.success("Kayıt başarılı! Giriş yapabilirsiniz.")
 
                             except Exception as e:
 
-                                st.error(f"Kayıt hatası: {e}")
+                                error_text = str(e).lower()
+
+                                if "already registered" in error_text or "already exists" in error_text or "user_already_exists" in error_text:
+
+                                    st.warning(
+                                        "Bu e-posta adresi zaten kayıtlı. "
+                                        "Giriş yapmayı dener misin?"
+                                    )
+
+                                else:
+
+                                    st.error(f"Kayıt hatası: {e}")
 
             if st.button("✖ Kapat", use_container_width=True):
 
