@@ -4,6 +4,7 @@ from supabase import create_client, Client
 from groq import Groq
 import uuid
 import re
+import pandas as pd
 from datetime import datetime, date, timedelta
 
 
@@ -122,12 +123,6 @@ supabase = get_supabase_client()
 # ============================================================
 # 3B. TARAYICI ÇEREZİ (kalıcı oturum için, saf JS ile)
 # ============================================================
-# extra_streamlit_components gibi çift yönlü custom component'ler bu
-# senaryoda güvenilmez senkronize oluyor. Bunun yerine:
-#   - Çerez YAZMA: components.html ile doğrudan JS enjekte ediyoruz.
-#   - Çerez OKUMA: sayfa yüklendiğinde JS çerezi kontrol edip varsa
-#     URL'e query parametresi olarak ekleyip sayfayı yeniden yüklüyor;
-#     Python tarafı bu parametreyi st.query_params ile okuyor.
 
 AUTH_COOKIE_NAME = "habit_coach_refresh_token"
 AUTH_QUERY_PARAM = "auth_token"
@@ -159,12 +154,7 @@ def delete_browser_cookie(name: str) -> None:
 
 def inject_cookie_check_redirect(name: str, query_param: str) -> None:
     """Sayfa ilk açıldığında çerezde token varsa ve URL'de henüz yoksa,
-    token'ı ÜST (asıl) sayfanın URL'ine ekleyip yeniden yükler.
-
-    Bu kod bir gizli iframe içinde çalışıyor; window.location kullanmak
-    sadece o iframe'i yönlendirir, gerçek sayfayı değil. Bu yüzden
-    window.top.location kullanmamız gerekiyor.
-    """
+    token'ı ÜST (asıl) sayfanın URL'ine ekleyip yeniden yükler."""
 
     js = f"""
     <script>
@@ -320,8 +310,6 @@ def upload_avatar(user_id: str, uploaded_file) -> str | None:
 
     try:
 
-        # Storage isteğinin RLS politikalarını geçebilmesi için
-        # önce oturumu (kullanıcı kimliğini) client'a yüklüyoruz.
         supabase.auth.set_session(access_token, refresh_token)
 
         ext = uploaded_file.name.split(".")[-1].lower()
@@ -339,7 +327,6 @@ def upload_avatar(user_id: str, uploaded_file) -> str | None:
 
         public_url = supabase.storage.from_("avatars").get_public_url(path)
 
-        # Aynı dosya adı yeniden kullanıldığında tarayıcı önbelleğini kırmak için
         cache_bust_url = f"{public_url}?t={int(datetime.utcnow().timestamp())}"
 
         return cache_bust_url
@@ -352,8 +339,7 @@ def upload_avatar(user_id: str, uploaded_file) -> str | None:
 
 
 def apply_auth_session(user, session) -> None:
-    """Giriş sonrası ya da çerezden otomatik oturum açarken kullanılan ortak kod:
-    kullanıcı, token ve profil bilgilerini session_state'e yazar."""
+    """Giriş sonrası ya da çerezden otomatik oturum açarken kullanılan ortak kod."""
 
     st.session_state.user = user
 
@@ -384,6 +370,82 @@ def apply_auth_session(user, session) -> None:
     st.session_state.current_chat_id = None
     st.session_state.sayfa = "🌱 AI Koç & Sohbet"
     st.session_state.show_auth_modal = False
+
+
+# ============================================================
+# 4B. ETKİNLİK YARDIMCI FONKSİYONLARI (YENİ)
+# ============================================================
+
+def load_active_events(city: str | None = None) -> list:
+    """Aktif (tarihi geçmemiş) etkinlikleri Supabase'ten çeker.
+    city verilirse sadece o şehirdekileri getirir."""
+
+    if not supabase:
+        return []
+
+    try:
+
+        query = (
+            supabase.table("events")
+            .select("*")
+            .eq("is_active", True)
+            .gte("event_date", str(date.today()))
+            .order("event_date")
+        )
+
+        if city:
+            query = query.eq("city", city)
+
+        result = query.execute()
+
+        return result.data
+
+    except Exception as e:
+
+        st.warning(f"Etkinlikler yüklenirken hata oluştu: {e}")
+
+        return []
+
+
+def deactivate_expired_events() -> None:
+    """Tarihi geçmiş etkinlikleri otomatik olarak pasife çeker.
+    Her sayfa yüklemesinde çalışır, hafif bir sorgu olduğu için sorun yaratmaz."""
+
+    if not supabase:
+        return
+
+    try:
+
+        supabase.table("events").update({"is_active": False}).lt(
+            "event_date", str(date.today())
+        ).eq("is_active", True).execute()
+
+    except Exception:
+
+        pass
+
+
+def get_event_by_id(event_id: str) -> dict | None:
+    """Tek bir etkinliğin detayını id'sine göre çeker."""
+
+    if not supabase:
+        return None
+
+    try:
+
+        result = (
+            supabase.table("events")
+            .select("*")
+            .eq("id", event_id)
+            .single()
+            .execute()
+        )
+
+        return result.data
+
+    except Exception:
+
+        return None
 
 
 # ============================================================
@@ -441,16 +503,13 @@ if "hobbies" not in st.session_state:
 if "mood" not in st.session_state:
     st.session_state.mood = None
 
+if "selected_event_id" not in st.session_state:
+    st.session_state.selected_event_id = None
+
 
 # ============================================================
 # 5A. HER ÇALIŞTIRMADA SUPABASE OTURUMUNU YENİDEN YÜKLE
 # ============================================================
-# `supabase` client'ı her script yeniden çalıştığında (rerun) sıfırdan
-# oluşturuluyor ve varsayılan olarak "anonim" durumda başlıyor. Kullanıcı
-# zaten giriş yapmışsa (session_state'te token varsa) bunu client'a
-# yeniden yüklemezsek, chats/messages gibi tablolara yapılan istekler
-# RLS (row-level security) tarafından reddediliyor. Bu yüzden her
-# rerun'da, sayfanın geri kalanı çalışmadan önce oturumu geri yüklüyoruz.
 
 if supabase and st.session_state.get("user") and st.session_state.get("access_token"):
 
@@ -469,8 +528,6 @@ if supabase and st.session_state.get("user") and st.session_state.get("access_to
 # ============================================================
 # 5B. TARAYICI ÇEREZİNDEN OTOMATİK OTURUM AÇMA
 # ============================================================
-# Sayfa yenilendiğinde veya tarayıcı kapatılıp açıldığında,
-# daha önce kaydedilmiş refresh token varsa oturumu otomatik geri yükler.
 
 if st.session_state.user is None and not st.session_state.get("auth_restore_done", False):
 
@@ -478,8 +535,6 @@ if st.session_state.user is None and not st.session_state.get("auth_restore_done
 
     if token_from_url:
 
-        # Aynı token ile tekrar tekrar denemeyelim (örn. token geçersizse
-        # sonsuz döngüye girmesin diye) bir defalık işaretliyoruz.
         st.session_state.auth_restore_done = True
 
         if supabase:
@@ -493,22 +548,17 @@ if st.session_state.user is None and not st.session_state.get("auth_restore_done
                     apply_auth_session(res.user, res.session)
                     st.session_state.auto_restored_notice = True
 
-                    # Yeni (rotate edilmiş) refresh token'ı normal render
-                    # sırasında (rerun'dan hemen önce değil) çereze yazacağız.
                     st.session_state.pending_remember_token = res.session.refresh_token
 
             except Exception:
 
                 delete_browser_cookie(AUTH_COOKIE_NAME)
 
-        # Token'ı adres çubuğundan temizle (orada kalmasın).
         st.query_params.clear()
         st.rerun()
 
     else:
 
-        # Çerezde token var mı diye bir kere kontrol et; varsa URL'e
-        # ekleyip sayfayı otomatik yeniden yükleyecek.
         if not st.session_state.get("cookie_check_injected", False):
 
             st.session_state.cookie_check_injected = True
@@ -634,20 +684,7 @@ if not st.session_state.user:
                                     }
                                 )
 
-                                # ---------------------------------
-                                # KULLANICI, TOKEN VE PROFİL BİLGİLERİ
-                                # ---------------------------------
-
                                 apply_auth_session(res.user, res.session)
-
-                                # ---------------------------------
-                                # KALICI OTURUM İÇİN TOKEN'I BEKLET
-                                # (sadece "Bu cihazı hatırla" işaretliyse)
-                                # Gerçek çerez yazma işlemi, ana sayfa
-                                # normal şekilde render edilirken yapılır —
-                                # aksi halde st.rerun() tarayıcının çerezi
-                                # kaydetmesine fırsat vermeden sayfayı kesiyor.
-                                # ---------------------------------
 
                                 if res.session and remember_device:
 
@@ -849,10 +886,6 @@ if not st.session_state.user:
                                     }
                                 )
 
-                                # Supabase, e-posta zaten kayıtlıysa hata fırlatmak
-                                # yerine (kullanıcı numarasını sızdırmamak için)
-                                # boş bir "identities" listesiyle dönüyor. Bunu
-                                # kontrol ederek kullanıcıya net bir mesaj veriyoruz.
                                 identities = getattr(signup_res.user, "identities", None)
 
                                 if signup_res.user and identities is not None and len(identities) == 0:
@@ -924,8 +957,6 @@ else:
     # ========================================================
     # BEKLEYEN "BU CİHAZI HATIRLA" ÇEREZİNİ ŞİMDİ YAZ
     # ========================================================
-    # Bu, sayfa zorla yeniden başlatılmadan (st.rerun() olmadan) çalışan
-    # normal bir render turu olduğu için tarayıcı çerezi gerçekten kaydedebiliyor.
 
     if st.session_state.get("pending_remember_token"):
 
@@ -937,8 +968,6 @@ else:
     # ========================================================
     # OTOMATİK GİRİŞ UYARISI
     # ========================================================
-    # Çerezden otomatik giriş yapıldıysa, bu cihazın hesabı olup
-    # olmadığını kullanıcının fark etmesi için bir kez göster.
 
     if st.session_state.get("auto_restored_notice", False):
 
@@ -1013,6 +1042,11 @@ else:
             if st.button("🌱 AI Koç & Sohbet", use_container_width=True):
 
                 st.session_state.sayfa = "🌱 AI Koç & Sohbet"
+                st.rerun()
+
+            if st.button("📍 Etkinlikler", use_container_width=True):
+
+                st.session_state.sayfa = "📍 Etkinlikler"
                 st.rerun()
 
             if st.button("📊 İlerlemelerim", use_container_width=True):
@@ -1246,6 +1280,133 @@ else:
                         st.error(f"Sistem Hatası: {e}")
 
     # ========================================================
+    # 8B. ETKİNLİKLER (YENİ)
+    # ========================================================
+
+    elif st.session_state.sayfa == "📍 Etkinlikler":
+
+        deactivate_expired_events()
+
+        st.title("📍 Yakınındaki Etkinlikler")
+
+        show_only_my_city = st.checkbox(
+            f"Sadece {st.session_state.city} şehrindekileri göster",
+            value=True
+        )
+
+        events = load_active_events(
+            city=st.session_state.city if show_only_my_city else None
+        )
+
+        if not events:
+
+            st.info("Şu an aktif etkinlik bulunmuyor.")
+
+        else:
+
+            # -----------------------------------------------
+            # HARİTA
+            # -----------------------------------------------
+
+            map_data = [
+                {"lat": e["latitude"], "lon": e["longitude"]}
+                for e in events
+                if e.get("latitude") and e.get("longitude")
+            ]
+
+            if map_data:
+
+                st.map(pd.DataFrame(map_data))
+
+            st.markdown("---")
+
+            # -----------------------------------------------
+            # LİSTE
+            # -----------------------------------------------
+
+            for event in events:
+
+                with st.container(border=True):
+
+                    col_info, col_action = st.columns([4, 1])
+
+                    with col_info:
+
+                        st.subheader(event["title"])
+                        st.caption(
+                            f"📅 {event['event_date']}  •  🕐 {event['event_time']}  •  "
+                            f"📍 {event.get('address', event['city'])}"
+                        )
+
+                        if event.get("category"):
+
+                            st.badge(event["category"])
+
+                        if event.get("description"):
+
+                            st.write(event["description"])
+
+                        st.caption(f"🏆 Katılım ödülü: {event.get('points_reward', 10)} puan")
+
+                    with col_action:
+
+                        if st.button(
+                            "Detay",
+                            key=f"detay_{event['id']}",
+                            use_container_width=True
+                        ):
+
+                            st.session_state.selected_event_id = event["id"]
+                            st.session_state.sayfa = "📍 Etkinlik Detay"
+                            st.rerun()
+
+    # ========================================================
+    # 8C. ETKİNLİK DETAY (YENİ)
+    # ========================================================
+
+    elif st.session_state.sayfa == "📍 Etkinlik Detay":
+
+        event_id = st.session_state.get("selected_event_id")
+        event = get_event_by_id(event_id) if event_id else None
+
+        if st.button("← Etkinliklere dön"):
+
+            st.session_state.sayfa = "📍 Etkinlikler"
+            st.rerun()
+
+        if not event:
+
+            st.warning("Etkinlik bulunamadı.")
+
+        else:
+
+            st.title(event["title"])
+
+            st.caption(
+                f"📅 {event['event_date']}  •  🕐 {event['event_time']}  •  "
+                f"📍 {event.get('address', event['city'])}"
+            )
+
+            if event.get("category"):
+
+                st.badge(event["category"])
+
+            st.markdown("---")
+
+            if event.get("description"):
+
+                st.write(event["description"])
+
+            st.markdown("---")
+
+            st.info(f"🏆 Bu etkinliğe katılıp doğrulama yaparsan **{event.get('points_reward', 10)} puan** kazanırsın.")
+
+            st.caption(
+                "QR kod ve konum ile katılım doğrulama özelliği "
+                "yakında burada aktif olacak."
+            )
+
+    # ========================================================
     # 9. İLERLEMELER
     # ========================================================
 
@@ -1268,7 +1429,6 @@ else:
 
         else:
 
-            # En son güncellenen sohbet en üstte görünsün
             for chat_id, chat in st.session_state.chats.items():
 
                 with st.expander(f"{chat['title']} — {chat['date']}"):
