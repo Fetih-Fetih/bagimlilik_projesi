@@ -2,3 +2,4 @@ streamlit
 groq
 supabase
 extra-streamlit-components
+qrcode[pil]
