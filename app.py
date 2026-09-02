@@ -4,6 +4,9 @@ from supabase import create_client, Client
 from groq import Groq
 import uuid
 import re
+import math
+import io
+import qrcode
 import pandas as pd
 from datetime import datetime, date, timedelta
 
@@ -451,8 +454,214 @@ def get_event_by_id(event_id: str) -> dict | None:
 
 
 # ============================================================
-# 4C. BELEDİYE PANELİ YARDIMCI FONKSİYONLARI (YENİ)
+# 4E. BELEDİYE PANELİ YARDIMCI FONKSİYONLARI (YENİ)
 # ============================================================
+
+# ============================================================
+# 4C. KATILIM / PUAN / QR YARDIMCI FONKSİYONLARI (YENİ)
+# ============================================================
+
+def generate_qr_image(event_id: str, qr_code: str) -> bytes | None:
+    """Bir etkinlik için, taratıldığında uygulamayı doğrulama linkiyle
+    açacak bir QR kod görseli üretir (PNG bytes olarak döner)."""
+
+    if not qr_code:
+        return None
+
+    try:
+
+        verify_url = f"https://relivee.com.tr/?verify_event={event_id}&code={qr_code}"
+
+        qr = qrcode.QRCode(box_size=8, border=2)
+        qr.add_data(verify_url)
+        qr.make(fit=True)
+
+        img = qr.make_image(fill_color="black", back_color="white")
+
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG")
+
+        return buffer.getvalue()
+
+    except Exception:
+
+        return None
+
+
+def haversine_distance_m(lat1, lon1, lat2, lon2) -> float:
+    """İki koordinat arasındaki mesafeyi metre cinsinden hesaplar."""
+
+    R = 6371000  # Dünya yarıçapı, metre
+
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    d_phi = math.radians(lat2 - lat1)
+    d_lambda = math.radians(lon2 - lon1)
+
+    a = (
+        math.sin(d_phi / 2) ** 2
+        + math.cos(phi1) * math.cos(phi2) * math.sin(d_lambda / 2) ** 2
+    )
+
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+    return R * c
+
+
+def has_user_participated(user_id: str, event_id: str) -> bool:
+    """Kullanıcının bu etkinliğe daha önce katılıp katılmadığını kontrol eder."""
+
+    if not supabase:
+        return False
+
+    try:
+
+        result = (
+            supabase.table("participations")
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("event_id", event_id)
+            .execute()
+        )
+
+        return len(result.data) > 0
+
+    except Exception:
+
+        return False
+
+
+def record_participation(user_id: str, event_id: str, method: str, points: int) -> bool:
+    """Katılımı kaydeder ve kullanıcının toplam puanını günceller."""
+
+    if not supabase:
+        return False
+
+    try:
+
+        supabase.table("participations").insert(
+            {
+                "user_id": user_id,
+                "event_id": event_id,
+                "verified": True,
+                "verification_method": method,
+                "points_earned": points
+            }
+        ).execute()
+
+        # Toplam puanı güncelle (kayıt yoksa oluştur, varsa üstüne ekle)
+        existing = (
+            supabase.table("user_points")
+            .select("total_points")
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+        if existing.data:
+
+            new_total = existing.data[0]["total_points"] + points
+
+            supabase.table("user_points").update(
+                {"total_points": new_total, "updated_at": datetime.utcnow().isoformat()}
+            ).eq("user_id", user_id).execute()
+
+        else:
+
+            supabase.table("user_points").insert(
+                {"user_id": user_id, "total_points": points}
+            ).execute()
+
+        return True
+
+    except Exception as e:
+
+        st.error(f"Katılım kaydedilemedi: {e}")
+
+        return False
+
+
+def get_user_total_points(user_id: str) -> int:
+    """Kullanıcının güncel toplam puanını döner."""
+
+    if not supabase:
+        return 0
+
+    try:
+
+        result = (
+            supabase.table("user_points")
+            .select("total_points")
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+        if result.data:
+
+            return result.data[0]["total_points"]
+
+        return 0
+
+    except Exception:
+
+        return 0
+
+
+def load_user_participations(user_id: str) -> list:
+    """Kullanıcının katılım geçmişini, etkinlik bilgileriyle birlikte getirir."""
+
+    if not supabase:
+        return []
+
+    try:
+
+        result = (
+            supabase.table("participations")
+            .select("*, events(title, event_date, city)")
+            .eq("user_id", user_id)
+            .order("participated_at", desc=True)
+            .execute()
+        )
+
+        return result.data
+
+    except Exception:
+
+        return []
+
+
+def trigger_geolocation_participation(event_id: str) -> None:
+    """Tarayıcıdan konum izni isteyip, alınan koordinatları sayfa
+    URL'ine ekleyerek yeniden yükleyen JS butonu render eder."""
+
+    js = f"""
+    <button id="loc-btn" style="
+        background-color:#2e7d32;color:white;border:none;
+        padding:0.6rem 1rem;border-radius:8px;font-weight:bold;
+        cursor:pointer;width:100%;">
+        📍 Konumumla Katıl
+    </button>
+    <p id="loc-status" style="font-size:0.85rem;color:#555;"></p>
+    <script>
+    document.getElementById('loc-btn').addEventListener('click', function() {{
+        document.getElementById('loc-status').innerText = 'Konum alınıyor...';
+        navigator.geolocation.getCurrentPosition(function(pos) {{
+            var lat = pos.coords.latitude;
+            var lon = pos.coords.longitude;
+            var topParams = new URLSearchParams(window.top.location.search);
+            topParams.set('verify_location_event', '{event_id}');
+            topParams.set('user_lat', lat);
+            topParams.set('user_lon', lon);
+            var newUrl = window.top.location.pathname + '?' + topParams.toString();
+            window.top.location.href = newUrl;
+        }}, function(err) {{
+            document.getElementById('loc-status').innerText =
+                'Konum alınamadı: ' + err.message;
+        }});
+    }});
+    </script>
+    """
+
+    components.html(js, height=90)
+
 
 def get_municipality_info(auth_user_id: str) -> dict | None:
     """Giriş yapan hesabın bir belediye hesabı olup olmadığını kontrol eder.
@@ -507,7 +716,8 @@ def load_municipality_events(municipality_id: str) -> list:
 
 
 def insert_event(municipality_id: str, data: dict) -> bool:
-    """Belediye adına yeni bir etkinlik ekler."""
+    """Belediye adına yeni bir etkinlik ekler. Her etkinliğe otomatik
+    benzersiz bir QR doğrulama kodu atanır."""
 
     if not supabase:
         return False
@@ -516,6 +726,7 @@ def insert_event(municipality_id: str, data: dict) -> bool:
 
         payload = dict(data)
         payload["municipality_id"] = municipality_id
+        payload["qr_code"] = uuid.uuid4().hex
 
         supabase.table("events").insert(payload).execute()
 
@@ -619,6 +830,19 @@ def render_municipality_panel(municipality: dict) -> None:
                         if event.get("description"):
 
                             st.write(event["description"])
+
+                        with st.popover("📱 QR Kodunu Göster"):
+
+                            qr_image = generate_qr_image(event["id"], event.get("qr_code", ""))
+
+                            if qr_image:
+
+                                st.image(qr_image, width=200)
+                                st.caption(
+                                    "Bu QR kodu etkinlik alanında basılı olarak "
+                                    "bulundurun. Katılımcılar telefon kamerasıyla "
+                                    "okutunca katılımları otomatik onaylanır."
+                                )
 
                     with col_toggle:
 
@@ -819,6 +1043,115 @@ if supabase and st.session_state.get("user") and st.session_state.get("access_to
     except Exception:
 
         pass
+
+
+# ============================================================
+# 5AB. QR / KONUM İLE KATILIM DOĞRULAMA (URL parametrelerinden)
+# ============================================================
+# Kullanıcı zaten giriş yapmışsa ve URL'de doğrulama parametreleri
+# varsa (QR taratıldığında veya konum butonuna basıldığında oluşur),
+# katılımı burada kaydedip parametreleri temizliyoruz.
+
+if st.session_state.get("user"):
+
+    verify_event_id = st.query_params.get("verify_event")
+    verify_code = st.query_params.get("code")
+
+    if verify_event_id and verify_code:
+
+        event = get_event_by_id(verify_event_id)
+
+        if event and event.get("qr_code") == verify_code:
+
+            if has_user_participated(st.session_state.user.id, verify_event_id):
+
+                st.session_state.participation_notice = (
+                    "info", "Bu etkinliğe zaten daha önce katılım sağladınız."
+                )
+
+            else:
+
+                ok = record_participation(
+                    st.session_state.user.id,
+                    verify_event_id,
+                    "qr",
+                    event.get("points_reward", 10)
+                )
+
+                if ok:
+
+                    st.session_state.participation_notice = (
+                        "success",
+                        f"🎉 Katılımın onaylandı! "
+                        f"{event.get('points_reward', 10)} puan kazandın."
+                    )
+
+        else:
+
+            st.session_state.participation_notice = (
+                "error", "QR kod geçersiz veya etkinlik bulunamadı."
+            )
+
+        st.query_params.clear()
+        st.rerun()
+
+    verify_loc_event_id = st.query_params.get("verify_location_event")
+    user_lat = st.query_params.get("user_lat")
+    user_lon = st.query_params.get("user_lon")
+
+    if verify_loc_event_id and user_lat and user_lon:
+
+        event = get_event_by_id(verify_loc_event_id)
+
+        if not event or not event.get("latitude") or not event.get("longitude"):
+
+            st.session_state.participation_notice = (
+                "error", "Bu etkinlik için konum bilgisi tanımlı değil."
+            )
+
+        elif has_user_participated(st.session_state.user.id, verify_loc_event_id):
+
+            st.session_state.participation_notice = (
+                "info", "Bu etkinliğe zaten daha önce katılım sağladınız."
+            )
+
+        else:
+
+            distance = haversine_distance_m(
+                float(user_lat), float(user_lon),
+                event["latitude"], event["longitude"]
+            )
+
+            if distance <= 300:
+
+                ok = record_participation(
+                    st.session_state.user.id,
+                    verify_loc_event_id,
+                    "location",
+                    event.get("points_reward", 10)
+                )
+
+                if ok:
+
+                    st.session_state.participation_notice = (
+                        "success",
+                        f"🎉 Konumun doğrulandı! "
+                        f"{event.get('points_reward', 10)} puan kazandın."
+                    )
+
+            else:
+
+                st.session_state.participation_notice = (
+                    "error",
+                    f"Etkinlik konumuna çok uzaksın "
+                    f"({int(distance)} metre). Etkinlik alanında tekrar dene."
+                )
+
+        st.session_state.sayfa = "📍 Etkinlik Detay"
+        st.session_state.selected_event_id = verify_loc_event_id
+
+        st.query_params.clear()
+        st.rerun()
 
 
 # ============================================================
@@ -1354,6 +1687,11 @@ else:
                 st.session_state.sayfa = "📍 Etkinlikler"
                 st.rerun()
 
+            if st.button("🏆 Puanlarım", use_container_width=True):
+
+                st.session_state.sayfa = "🏆 Puanlarım"
+                st.rerun()
+
             if st.button("📊 İlerlemelerim", use_container_width=True):
 
                 st.session_state.sayfa = "📊 İlerlemelerim"
@@ -1655,6 +1993,19 @@ else:
 
     elif st.session_state.sayfa == "📍 Etkinlik Detay":
 
+        # Bekleyen katılım bildirimini göster (QR/konum doğrulamasından sonra)
+        if st.session_state.get("participation_notice"):
+
+            notice_type, notice_text = st.session_state.participation_notice
+            st.session_state.participation_notice = None
+
+            if notice_type == "success":
+                st.success(notice_text)
+            elif notice_type == "info":
+                st.info(notice_text)
+            else:
+                st.error(notice_text)
+
         event_id = st.session_state.get("selected_event_id")
         event = get_event_by_id(event_id) if event_id else None
 
@@ -1698,12 +2049,65 @@ else:
 
             st.markdown("---")
 
-            st.info(f"🏆 Bu etkinliğe katılıp doğrulama yaparsan **{event.get('points_reward', 10)} puan** kazanırsın.")
+            already_joined = has_user_participated(st.session_state.user.id, event["id"])
 
-            st.caption(
-                "QR kod ve konum ile katılım doğrulama özelliği "
-                "yakında burada aktif olacak."
-            )
+            if already_joined:
+
+                st.success("✅ Bu etkinliğe katılımın onaylanmış durumda.")
+
+            else:
+
+                st.info(f"🏆 Bu etkinliğe katılıp doğrulama yaparsan **{event.get('points_reward', 10)} puan** kazanırsın.")
+
+                st.markdown("**Katılımını nasıl doğrulamak istersin?**")
+
+                st.caption(
+                    "📱 **QR ile:** Etkinlik alanında asılı QR kodu telefonunun "
+                    "kamerasıyla okut, katılımın otomatik onaylanır."
+                )
+
+                st.caption("📍 **Konum ile:** Etkinlik alanındaysan aşağıdaki butona bas.")
+
+                trigger_geolocation_participation(event["id"])
+
+    # ========================================================
+    # 8D. PUANLARIM (YENİ)
+    # ========================================================
+
+    elif st.session_state.sayfa == "🏆 Puanlarım":
+
+        st.title("🏆 Puanlarım")
+
+        total_points = get_user_total_points(st.session_state.user.id)
+
+        st.metric("Toplam Puan", total_points)
+
+        st.markdown("---")
+
+        st.subheader("📜 Katılım Geçmişi")
+
+        participations = load_user_participations(st.session_state.user.id)
+
+        if not participations:
+
+            st.info("Henüz hiçbir etkinliğe katılmadın.")
+
+        else:
+
+            for p in participations:
+
+                event_info = p.get("events") or {}
+
+                method_label = "📱 QR" if p.get("verification_method") == "qr" else "📍 Konum"
+
+                with st.container(border=True):
+
+                    st.write(f"**{event_info.get('title', 'Etkinlik')}**")
+                    st.caption(
+                        f"{event_info.get('event_date', '')}  •  "
+                        f"{method_label} ile doğrulandı  •  "
+                        f"🏆 +{p.get('points_earned', 0)} puan"
+                    )
 
     # ========================================================
     # 9. İLERLEMELER
