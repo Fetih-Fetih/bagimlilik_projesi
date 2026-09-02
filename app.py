@@ -19,6 +19,40 @@ st.set_page_config(
 
 
 # ============================================================
+# 1B. SABİT LİSTELER (şehir, hobi, ruh hali)
+# ============================================================
+
+TURKISH_CITIES = [
+    "Adana", "Adıyaman", "Afyonkarahisar", "Ağrı", "Amasya", "Ankara", "Antalya",
+    "Artvin", "Aydın", "Balıkesir", "Bilecik", "Bingöl", "Bitlis", "Bolu",
+    "Burdur", "Bursa", "Çanakkale", "Çankırı", "Çorum", "Denizli", "Diyarbakır",
+    "Edirne", "Elazığ", "Erzincan", "Erzurum", "Eskişehir", "Gaziantep",
+    "Giresun", "Gümüşhane", "Hakkari", "Hatay", "Isparta", "Mersin", "İstanbul",
+    "İzmir", "Kars", "Kastamonu", "Kayseri", "Kırklareli", "Kırşehir", "Kocaeli",
+    "Konya", "Kütahya", "Malatya", "Manisa", "Kahramanmaraş", "Mardin", "Muğla",
+    "Muş", "Nevşehir", "Niğde", "Ordu", "Rize", "Sakarya", "Samsun", "Siirt",
+    "Sinop", "Sivas", "Tekirdağ", "Tokat", "Trabzon", "Tunceli", "Şanlıurfa",
+    "Uşak", "Van", "Yozgat", "Zonguldak", "Aksaray", "Bayburt", "Karaman",
+    "Kırıkkale", "Batman", "Şırnak", "Bartın", "Ardahan", "Iğdır", "Yalova",
+    "Karabük", "Kilis", "Osmaniye", "Düzce"
+]
+
+HOBBY_OPTIONS = [
+    "Spor", "Dans", "Müzik", "Sanat", "Kitap & edebiyat", "Sinema & tiyatro",
+    "Astronomi & uzay", "Bilim & teknoloji", "Doğa & kamp",
+    "Yemek & gastronomi", "El sanatları & tasarım", "Oyun & masa oyunları",
+    "Fotoğrafçılık", "Gezi & kültür", "Gönüllülük & sosyal sorumluluk"
+]
+
+MOOD_OPTIONS = {
+    "Enerjik": "⚡",
+    "Üzgün": "😔",
+    "Stresli": "😖",
+    "Yorgun": "🥱"
+}
+
+
+# ============================================================
 # 2. CSS
 # ============================================================
 
@@ -337,6 +371,8 @@ def apply_auth_session(user, session) -> None:
     st.session_state.birth_date = meta.get("birth_date", "2000-01-01")
     st.session_state.gender = meta.get("gender", "Belirtilmedi")
     st.session_state.avatar_url = meta.get("avatar_url", "")
+    st.session_state.city = meta.get("city", "İstanbul")
+    st.session_state.hobbies = meta.get("hobbies", [])
 
     created_at = getattr(user, "created_at", None)
 
@@ -389,6 +425,15 @@ if "gender" not in st.session_state:
 
 if "avatar_url" not in st.session_state:
     st.session_state.avatar_url = ""
+
+if "city" not in st.session_state:
+    st.session_state.city = "İstanbul"
+
+if "hobbies" not in st.session_state:
+    st.session_state.hobbies = []
+
+if "mood" not in st.session_state:
+    st.session_state.mood = None
 
 
 # ============================================================
@@ -609,6 +654,19 @@ if not st.session_state.user:
                             key="r_gnd"
                         )
 
+                    reg_city = st.selectbox(
+                        "Yaşadığın Şehir",
+                        TURKISH_CITIES,
+                        index=TURKISH_CITIES.index("İstanbul"),
+                        key="r_city"
+                    )
+
+                    reg_hobbies = st.multiselect(
+                        "İlgi Alanların (birden fazla seçebilirsin)",
+                        HOBBY_OPTIONS,
+                        key="r_hobbies"
+                    )
+
                     if st.button("Kayıt Ol", key="btn_r", type="primary", use_container_width=True):
 
                         if not reg_name or not reg_email or not reg_pass:
@@ -639,7 +697,9 @@ if not st.session_state.user:
                                             "data": {
                                                 "full_name": reg_name.strip(),
                                                 "birth_date": str(reg_bdate),
-                                                "gender": reg_gender
+                                                "gender": reg_gender,
+                                                "city": reg_city,
+                                                "hobbies": reg_hobbies
                                             }
                                         }
                                     }
@@ -856,6 +916,32 @@ else:
         )
 
         # ====================================================
+        # RUH HALİ SEÇİMİ (AI önerilerini kişiselleştirmek için)
+        # ====================================================
+
+        st.markdown("**Şu an nasıl hissediyorsun?**")
+
+        mood_cols = st.columns(len(MOOD_OPTIONS))
+
+        for mood_col, (mood_name, mood_emoji) in zip(mood_cols, MOOD_OPTIONS.items()):
+
+            with mood_col:
+
+                is_selected = st.session_state.mood == mood_name
+
+                if st.button(
+                    f"{mood_emoji} {mood_name}",
+                    key=f"mood_{mood_name}",
+                    type="primary" if is_selected else "secondary",
+                    use_container_width=True
+                ):
+
+                    st.session_state.mood = mood_name
+                    st.rerun()
+
+        st.markdown("")
+
+        # ====================================================
         # GROQ
         # ====================================================
 
@@ -944,8 +1030,23 @@ else:
 
                         system_prompt = (
                             "Sen bir motivasyon ve alışkanlık koçusun. "
-                            f"Kullanıcı adı: {display_name}."
+                            f"Kullanıcı adı: {display_name}. "
+                            f"Yaşadığı şehir: {st.session_state.city}. "
                         )
+
+                        if st.session_state.hobbies:
+
+                            system_prompt += (
+                                f"İlgi alanları: {', '.join(st.session_state.hobbies)}. "
+                            )
+
+                        if st.session_state.mood:
+
+                            system_prompt += (
+                                f"Şu anki ruh hali: {st.session_state.mood}. "
+                                "Cevaplarını ve önerilerini bu ruh haline, "
+                                "şehrine ve ilgi alanlarına göre kişiselleştir."
+                            )
 
                         api_messages = [{"role": "system", "content": system_prompt}]
 
@@ -1140,6 +1241,30 @@ else:
 
             new_gender = st.selectbox("Cinsiyet", gender_options, index=current_gender_idx)
 
+            # -----------------------------------------------
+            # ŞEHİR
+            # -----------------------------------------------
+
+            if st.session_state.city in TURKISH_CITIES:
+
+                current_city_idx = TURKISH_CITIES.index(st.session_state.city)
+
+            else:
+
+                current_city_idx = TURKISH_CITIES.index("İstanbul")
+
+            new_city = st.selectbox("Yaşadığın Şehir", TURKISH_CITIES, index=current_city_idx)
+
+            # -----------------------------------------------
+            # İLGİ ALANLARI
+            # -----------------------------------------------
+
+            new_hobbies = st.multiselect(
+                "İlgi Alanların",
+                HOBBY_OPTIONS,
+                default=[h for h in st.session_state.hobbies if h in HOBBY_OPTIONS]
+            )
+
             st.markdown("")
 
             # -----------------------------------------------
@@ -1195,7 +1320,9 @@ else:
                             "data": {
                                 "full_name": new_name.strip(),
                                 "birth_date": str(new_bdate),
-                                "gender": new_gender
+                                "gender": new_gender,
+                                "city": new_city,
+                                "hobbies": new_hobbies
                             }
                         }
                     )
@@ -1208,6 +1335,8 @@ else:
                     st.session_state.profile_name = new_name.strip()
                     st.session_state.birth_date = str(new_bdate)
                     st.session_state.gender = new_gender
+                    st.session_state.city = new_city
+                    st.session_state.hobbies = new_hobbies
 
                     st.success("Profil başarıyla güncellendi!")
                     st.rerun()
