@@ -411,6 +411,9 @@ if "show_auth_modal" not in st.session_state:
 if "auth_mode" not in st.session_state:
     st.session_state.auth_mode = "login"
 
+if "reset_email_pending" not in st.session_state:
+    st.session_state.reset_email_pending = None
+
 if "gun_sayisi" not in st.session_state:
     st.session_state.gun_sayisi = 1
 
@@ -559,33 +562,35 @@ if not st.session_state.user:
 
             else:
 
-                seg_login, seg_register = st.columns(2)
+                if st.session_state.auth_mode not in ("reset_request", "reset_verify"):
 
-                with seg_login:
+                    seg_login, seg_register = st.columns(2)
 
-                    if st.button(
-                        "🔑 Giriş Yap",
-                        key="seg_login_btn",
-                        type="primary" if st.session_state.auth_mode == "login" else "secondary",
-                        use_container_width=True
-                    ):
+                    with seg_login:
 
-                        st.session_state.auth_mode = "login"
-                        st.rerun()
+                        if st.button(
+                            "🔑 Giriş Yap",
+                            key="seg_login_btn",
+                            type="primary" if st.session_state.auth_mode == "login" else "secondary",
+                            use_container_width=True
+                        ):
 
-                with seg_register:
+                            st.session_state.auth_mode = "login"
+                            st.rerun()
 
-                    if st.button(
-                        "📝 Kayıt Ol",
-                        key="seg_register_btn",
-                        type="primary" if st.session_state.auth_mode == "register" else "secondary",
-                        use_container_width=True
-                    ):
+                    with seg_register:
 
-                        st.session_state.auth_mode = "register"
-                        st.rerun()
+                        if st.button(
+                            "📝 Kayıt Ol",
+                            key="seg_register_btn",
+                            type="primary" if st.session_state.auth_mode == "register" else "secondary",
+                            use_container_width=True
+                        ):
 
-                st.markdown("")
+                            st.session_state.auth_mode = "register"
+                            st.rerun()
+
+                    st.markdown("")
 
                 # =================================================
                 # GİRİŞ
@@ -655,6 +660,114 @@ if not st.session_state.user:
                             except Exception as e:
 
                                 st.error(f"Giriş başarısız: {e}")
+
+                    if st.button("Şifremi unuttum", key="btn_forgot", use_container_width=True):
+
+                        st.session_state.auth_mode = "reset_request"
+                        st.rerun()
+
+                # =================================================
+                # ŞİFRE SIFIRLAMA — 1. ADIM: E-POSTA GİR, KOD GÖNDER
+                # =================================================
+
+                if st.session_state.auth_mode == "reset_request":
+
+                    st.markdown("**Şifre Sıfırlama**")
+                    st.caption("Giriş yaptığın e-posta adresini yaz, sana bir doğrulama kodu gönderelim.")
+
+                    reset_email = st.text_input("E-Posta Adresi", key="reset_email")
+
+                    if st.button("Doğrulama Kodu Gönder", type="primary", key="btn_reset_send", use_container_width=True):
+
+                        if not reset_email or not is_valid_email(reset_email):
+
+                            st.warning("Lütfen geçerli bir e-posta adresi girin.")
+
+                        else:
+
+                            try:
+
+                                supabase.auth.reset_password_email(reset_email.strip().lower())
+
+                                st.session_state.reset_email_pending = reset_email.strip().lower()
+                                st.session_state.auth_mode = "reset_verify"
+                                st.success("Kod gönderildi! E-postanı kontrol et.")
+                                st.rerun()
+
+                            except Exception as e:
+
+                                st.error(f"Kod gönderilemedi: {e}")
+
+                    if st.button("← Girişe dön", key="btn_back_to_login_1", use_container_width=True):
+
+                        st.session_state.auth_mode = "login"
+                        st.rerun()
+
+                # =================================================
+                # ŞİFRE SIFIRLAMA — 2. ADIM: KODU GİR, YENİ ŞİFRE BELİRLE
+                # =================================================
+
+                if st.session_state.auth_mode == "reset_verify":
+
+                    st.markdown("**Şifre Sıfırlama**")
+                    st.caption(
+                        f"**{st.session_state.get('reset_email_pending', '')}** adresine "
+                        "gönderilen 6 haneli kodu ve yeni şifreni gir."
+                    )
+
+                    reset_code = st.text_input("Doğrulama Kodu", key="reset_code")
+                    new_pass_1 = st.text_input("Yeni Şifre", type="password", key="reset_new_pass")
+                    new_pass_2 = st.text_input("Yeni Şifre (Tekrar)", type="password", key="reset_new_pass_2")
+
+                    if st.button("Şifreyi Sıfırla", type="primary", key="btn_reset_confirm", use_container_width=True):
+
+                        if not reset_code or not new_pass_1:
+
+                            st.warning("Lütfen kodu ve yeni şifreni gir.")
+
+                        elif len(new_pass_1) < 6:
+
+                            st.warning("Şifre en az 6 karakter olmalıdır.")
+
+                        elif new_pass_1 != new_pass_2:
+
+                            st.error("Şifreler eşleşmiyor!")
+
+                        else:
+
+                            try:
+
+                                verify_res = supabase.auth.verify_otp(
+                                    {
+                                        "email": st.session_state.get("reset_email_pending", ""),
+                                        "token": reset_code.strip(),
+                                        "type": "recovery"
+                                    }
+                                )
+
+                                if verify_res.session:
+
+                                    supabase.auth.set_session(
+                                        verify_res.session.access_token,
+                                        verify_res.session.refresh_token
+                                    )
+
+                                supabase.auth.update_user({"password": new_pass_1})
+
+                                st.session_state.auth_mode = "login"
+                                st.session_state.reset_email_pending = None
+
+                                st.success("Şifren güncellendi! Şimdi yeni şifrenle giriş yapabilirsin.")
+                                st.rerun()
+
+                            except Exception as e:
+
+                                st.error(f"Kod geçersiz ya da süresi dolmuş: {e}")
+
+                    if st.button("← Girişe dön", key="btn_back_to_login_2", use_container_width=True):
+
+                        st.session_state.auth_mode = "login"
+                        st.rerun()
 
                 # =================================================
                 # KAYIT
