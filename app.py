@@ -1228,7 +1228,7 @@ else:
 
                         chat_completion = client.chat.completions.create(
                             messages=api_messages,
-                            model="llama-3.3-70b-versatile"
+                            model="openai/gpt-oss-120b"
                         )
 
                         ai_reply = chat_completion.choices[0].message.content
