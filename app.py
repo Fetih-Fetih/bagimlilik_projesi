@@ -371,6 +371,8 @@ def apply_auth_session(user, session) -> None:
     st.session_state.sayfa = "🌱 AI Koç & Sohbet"
     st.session_state.show_auth_modal = False
 
+    st.session_state.municipality = get_municipality_info(user.id)
+
 
 # ============================================================
 # 4B. ETKİNLİK YARDIMCI FONKSİYONLARI (YENİ)
@@ -449,6 +451,297 @@ def get_event_by_id(event_id: str) -> dict | None:
 
 
 # ============================================================
+# 4C. BELEDİYE PANELİ YARDIMCI FONKSİYONLARI (YENİ)
+# ============================================================
+
+def get_municipality_info(auth_user_id: str) -> dict | None:
+    """Giriş yapan hesabın bir belediye hesabı olup olmadığını kontrol eder.
+    Belediye ise bilgilerini döner, değilse None döner."""
+
+    if not supabase or not auth_user_id:
+        return None
+
+    try:
+
+        result = (
+            supabase.table("municipalities")
+            .select("*")
+            .eq("auth_user_id", auth_user_id)
+            .execute()
+        )
+
+        if result.data:
+
+            return result.data[0]
+
+        return None
+
+    except Exception:
+
+        return None
+
+
+def load_municipality_events(municipality_id: str) -> list:
+    """Bir belediyenin eklediği TÜM etkinlikleri (aktif + pasif) getirir."""
+
+    if not supabase:
+        return []
+
+    try:
+
+        result = (
+            supabase.table("events")
+            .select("*")
+            .eq("municipality_id", municipality_id)
+            .order("event_date", desc=True)
+            .execute()
+        )
+
+        return result.data
+
+    except Exception as e:
+
+        st.warning(f"Etkinlikler yüklenirken hata oluştu: {e}")
+
+        return []
+
+
+def insert_event(municipality_id: str, data: dict) -> bool:
+    """Belediye adına yeni bir etkinlik ekler."""
+
+    if not supabase:
+        return False
+
+    try:
+
+        payload = dict(data)
+        payload["municipality_id"] = municipality_id
+
+        supabase.table("events").insert(payload).execute()
+
+        return True
+
+    except Exception as e:
+
+        st.error(f"Etkinlik eklenemedi: {e}")
+
+        return False
+
+
+def set_event_active(event_id: str, is_active: bool) -> bool:
+    """Bir etkinliği aktif/pasif yapar (belediye kendi etkinliğini kapatabilsin)."""
+
+    if not supabase:
+        return False
+
+    try:
+
+        supabase.table("events").update({"is_active": is_active}).eq(
+            "id", event_id
+        ).execute()
+
+        return True
+
+    except Exception as e:
+
+        st.error(f"Etkinlik güncellenemedi: {e}")
+
+        return False
+
+
+def render_municipality_panel(municipality: dict) -> None:
+    """Belediye hesabı ile giriş yapıldığında gösterilen tam ayrı panel.
+    Normal kullanıcı arayüzünün yerine geçer."""
+
+    col_title, col_logout = st.columns([4, 1.2])
+
+    with col_title:
+
+        st.title(f"🏛️ {municipality['name']} — Etkinlik Paneli")
+        st.caption(f"Şehir: {municipality['city']}")
+
+    with col_logout:
+
+        if st.button("🚪 Çıkış Yap", type="primary", use_container_width=True):
+
+            if supabase:
+
+                try:
+
+                    supabase.auth.sign_out()
+
+                except Exception:
+
+                    pass
+
+            st.session_state.clear()
+            st.rerun()
+
+    st.divider()
+
+    tab_list, tab_new = st.tabs(["📋 Etkinliklerim", "➕ Yeni Etkinlik Ekle"])
+
+    # ------------------------------------------------------
+    # ETKİNLİKLERİM (LİSTE)
+    # ------------------------------------------------------
+
+    with tab_list:
+
+        events = load_municipality_events(municipality["id"])
+
+        if not events:
+
+            st.info("Henüz hiç etkinlik eklemediniz.")
+
+        else:
+
+            for event in events:
+
+                status_label = "🟢 Aktif" if event.get("is_active") else "⚪ Pasif"
+
+                with st.container(border=True):
+
+                    col_info, col_toggle = st.columns([4, 1])
+
+                    with col_info:
+
+                        st.subheader(f"{event['title']}  —  {status_label}")
+                        st.caption(
+                            f"📅 {event['event_date']}  •  🕐 {event['event_time']}  •  "
+                            f"📍 {event.get('address', event['city'])}  •  "
+                            f"🏆 {event.get('points_reward', 10)} puan"
+                        )
+
+                        if event.get("category"):
+
+                            st.badge(event["category"])
+
+                        if event.get("description"):
+
+                            st.write(event["description"])
+
+                    with col_toggle:
+
+                        if event.get("is_active"):
+
+                            if st.button(
+                                "Pasife Al",
+                                key=f"deactivate_{event['id']}",
+                                use_container_width=True
+                            ):
+
+                                if set_event_active(event["id"], False):
+
+                                    st.rerun()
+
+                        else:
+
+                            if st.button(
+                                "Aktif Et",
+                                key=f"activate_{event['id']}",
+                                use_container_width=True
+                            ):
+
+                                if set_event_active(event["id"], True):
+
+                                    st.rerun()
+
+    # ------------------------------------------------------
+    # YENİ ETKİNLİK EKLE
+    # ------------------------------------------------------
+
+    with tab_new:
+
+        with st.form("new_event_form", clear_on_submit=True):
+
+            ev_title = st.text_input("Etkinlik Adı *")
+            ev_description = st.text_area("Açıklama")
+
+            ev_category = st.selectbox(
+                "Kategori",
+                HOBBY_OPTIONS
+            )
+
+            col_date, col_time = st.columns(2)
+
+            with col_date:
+
+                ev_date = st.date_input(
+                    "Etkinlik Tarihi *",
+                    value=date.today() + timedelta(days=1)
+                )
+
+            with col_time:
+
+                ev_time = st.time_input("Etkinlik Saati *")
+
+            ev_address = st.text_input(
+                "Adres",
+                value=f"{municipality['city']} Merkez"
+            )
+
+            col_lat, col_lon = st.columns(2)
+
+            with col_lat:
+
+                ev_lat = st.number_input(
+                    "Enlem (latitude)",
+                    format="%.6f",
+                    value=0.0,
+                    help="Google Maps'te konuma sağ tıklayıp koordinatları kopyalayabilirsiniz."
+                )
+
+            with col_lon:
+
+                ev_lon = st.number_input(
+                    "Boylam (longitude)",
+                    format="%.6f",
+                    value=0.0
+                )
+
+            ev_points = st.number_input(
+                "Katılım Ödülü (puan)",
+                min_value=1,
+                value=10,
+                step=5
+            )
+
+            submitted_event = st.form_submit_button(
+                "✅ Etkinliği Yayınla", type="primary", use_container_width=True
+            )
+
+        if submitted_event:
+
+            if not ev_title.strip():
+
+                st.error("Etkinlik adı boş olamaz.")
+
+            else:
+
+                success = insert_event(
+                    municipality["id"],
+                    {
+                        "title": ev_title.strip(),
+                        "description": ev_description.strip(),
+                        "category": ev_category,
+                        "city": municipality["city"],
+                        "address": ev_address.strip(),
+                        "latitude": ev_lat if ev_lat != 0.0 else None,
+                        "longitude": ev_lon if ev_lon != 0.0 else None,
+                        "event_date": str(ev_date),
+                        "event_time": ev_time.strftime("%H:%M"),
+                        "points_reward": int(ev_points),
+                        "is_active": True
+                    }
+                )
+
+                if success:
+
+                    st.success("Etkinlik başarıyla yayınlandı!")
+                    st.rerun()
+
+
+# ============================================================
 # 5. SESSION STATE
 # ============================================================
 
@@ -505,6 +798,9 @@ if "mood" not in st.session_state:
 
 if "selected_event_id" not in st.session_state:
     st.session_state.selected_event_id = None
+
+if "municipality" not in st.session_state:
+    st.session_state.municipality = None
 
 
 # ============================================================
@@ -1009,6 +1305,15 @@ else:
                 st.rerun()
 
     # ========================================================
+    # BELEDİYE HESABIYSA, TAMAMEN AYRI PANELİ GÖSTER VE DUR
+    # ========================================================
+
+    if st.session_state.get("municipality"):
+
+        render_municipality_panel(st.session_state.municipality)
+        st.stop()
+
+    # ========================================================
     # MENÜ
     # ========================================================
 
@@ -1305,22 +1610,6 @@ else:
         else:
 
             # -----------------------------------------------
-            # HARİTA
-            # -----------------------------------------------
-
-            map_data = [
-                {"lat": e["latitude"], "lon": e["longitude"]}
-                for e in events
-                if e.get("latitude") and e.get("longitude")
-            ]
-
-            if map_data:
-
-                st.map(pd.DataFrame(map_data))
-
-            st.markdown("---")
-
-            # -----------------------------------------------
             # LİSTE
             # -----------------------------------------------
 
@@ -1396,6 +1685,16 @@ else:
             if event.get("description"):
 
                 st.write(event["description"])
+
+            # -----------------------------------------------
+            # HARİTA (sadece bu etkinliğin konumu)
+            # -----------------------------------------------
+
+            if event.get("latitude") and event.get("longitude"):
+
+                st.map(pd.DataFrame(
+                    [{"lat": event["latitude"], "lon": event["longitude"]}]
+                ))
 
             st.markdown("---")
 
