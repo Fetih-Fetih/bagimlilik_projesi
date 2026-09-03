@@ -2337,6 +2337,46 @@ else:
                                 "şehrine ve ilgi alanlarına göre kişiselleştir."
                             )
 
+                        # -----------------------------------------------
+                        # GERÇEK ETKİNLİKLERİ AI'A TANIT (YENİ)
+                        # -----------------------------------------------
+                        # Kullanıcının şehrindeki aktif etkinlikleri çekip,
+                        # AI'ın bunlardan gerçek öneriler yapabilmesi için
+                        # sistem promptuna ekliyoruz.
+
+                        nearby_events = load_active_events(city=st.session_state.city)
+
+                        if nearby_events:
+
+                            events_text = "\n".join(
+                                f"- {e['title']} | Kategori: {e.get('category', 'Belirtilmemiş')} | "
+                                f"Tarih: {e['event_date']} {e['event_time']} | "
+                                f"Yer: {e.get('address', e['city'])} | "
+                                f"Katılım ödülü: {e.get('points_reward', 10)} puan"
+                                for e in nearby_events[:15]
+                            )
+
+                            system_prompt += (
+                                "\n\nKullanıcının şehrinde şu anda gerçekleşecek "
+                                "gerçek etkinlikler var:\n"
+                                f"{events_text}\n\n"
+                                "Kullanıcının ruh haline ve ilgi alanlarına en uygun "
+                                "olan 1-3 etkinliği isimleriyle, tarihleriyle ve "
+                                "neden uygun olduğunu açıklayarak öner. Etkinlik "
+                                "önerirken bu listede OLMAYAN bir etkinlik uydurma. "
+                                "Kullanıcıya, etkinliğin tüm detaylarını ve katılım "
+                                "onayını uygulamadaki '📍 Etkinlikler' sayfasından "
+                                "görebileceğini hatırlat."
+                            )
+
+                        else:
+
+                            system_prompt += (
+                                "\n\nKullanıcının şehrinde şu an aktif bir etkinlik "
+                                "bulunmuyor. Bunu nazikçe belirt ve genel bir "
+                                "alışkanlık/motivasyon önerisi ver."
+                            )
+
                         api_messages = [{"role": "system", "content": system_prompt}]
 
                         for msg in st.session_state.chats[chat_id]["messages"]:
