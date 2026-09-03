@@ -375,6 +375,7 @@ def apply_auth_session(user, session) -> None:
     st.session_state.show_auth_modal = False
 
     st.session_state.municipality = get_municipality_info(user.id)
+    st.session_state.business = get_business_info(user.id)
 
 
 # ============================================================
@@ -451,6 +452,428 @@ def get_event_by_id(event_id: str) -> dict | None:
     except Exception:
 
         return None
+
+
+# ============================================================
+# 4D. İŞLETME (SPONSOR) YARDIMCI FONKSİYONLARI (YENİ)
+# ============================================================
+
+def get_business_info(auth_user_id: str) -> dict | None:
+    """Giriş yapan hesabın bir işletme hesabı olup olmadığını kontrol eder."""
+
+    if not supabase or not auth_user_id:
+        return None
+
+    try:
+
+        result = (
+            supabase.table("businesses")
+            .select("*")
+            .eq("auth_user_id", auth_user_id)
+            .execute()
+        )
+
+        if result.data:
+
+            return result.data[0]
+
+        return None
+
+    except Exception:
+
+        return None
+
+
+def load_business_rewards(business_id: str) -> list:
+    """Bir işletmenin eklediği tüm ödülleri (aktif + pasif) getirir."""
+
+    if not supabase:
+        return []
+
+    try:
+
+        result = (
+            supabase.table("rewards")
+            .select("*")
+            .eq("business_id", business_id)
+            .order("created_at", desc=True)
+            .execute()
+        )
+
+        return result.data
+
+    except Exception as e:
+
+        st.warning(f"Ödüller yüklenirken hata oluştu: {e}")
+
+        return []
+
+
+def insert_reward(business_id: str, data: dict) -> bool:
+    """İşletme adına yeni bir ödül/kampanya ekler."""
+
+    if not supabase:
+        return False
+
+    try:
+
+        payload = dict(data)
+        payload["business_id"] = business_id
+
+        supabase.table("rewards").insert(payload).execute()
+
+        return True
+
+    except Exception as e:
+
+        st.error(f"Ödül eklenemedi: {e}")
+
+        return False
+
+
+def set_reward_active(reward_id: str, is_active: bool) -> bool:
+    """Bir ödülü aktif/pasif yapar."""
+
+    if not supabase:
+        return False
+
+    try:
+
+        supabase.table("rewards").update({"is_active": is_active}).eq(
+            "id", reward_id
+        ).execute()
+
+        return True
+
+    except Exception as e:
+
+        st.error(f"Ödül güncellenemedi: {e}")
+
+        return False
+
+
+def load_active_rewards() -> list:
+    """Kullanıcıya gösterilecek, aktif olan tüm ödülleri işletme adıyla getirir."""
+
+    if not supabase:
+        return []
+
+    try:
+
+        result = (
+            supabase.table("rewards")
+            .select("*, businesses(name, category)")
+            .eq("is_active", True)
+            .order("points_cost")
+            .execute()
+        )
+
+        return result.data
+
+    except Exception as e:
+
+        st.warning(f"Ödüller yüklenirken hata oluştu: {e}")
+
+        return []
+
+
+def redeem_reward(user_id: str, reward_id: str, points_cost: int) -> str | None:
+    """Kullanıcının puanını harcayarak ödülü talep etmesini sağlar.
+    Başarılıysa işletmede gösterilecek 6 haneli kodu döner."""
+
+    if not supabase:
+        return None
+
+    try:
+
+        current_points = get_user_total_points(user_id)
+
+        if current_points < points_cost:
+
+            st.error("Yeterli puanın yok.")
+
+            return None
+
+        code = str(uuid.uuid4().int)[:6]
+
+        supabase.table("reward_redemptions").insert(
+            {
+                "user_id": user_id,
+                "reward_id": reward_id,
+                "redemption_code": code,
+                "used": False
+            }
+        ).execute()
+
+        new_total = current_points - points_cost
+
+        supabase.table("user_points").update(
+            {"total_points": new_total, "updated_at": datetime.utcnow().isoformat()}
+        ).eq("user_id", user_id).execute()
+
+        return code
+
+    except Exception as e:
+
+        st.error(f"Ödül talep edilemedi: {e}")
+
+        return None
+
+
+def load_user_redemptions(user_id: str) -> list:
+    """Kullanıcının geçmiş ödül taleplerini getirir."""
+
+    if not supabase:
+        return []
+
+    try:
+
+        result = (
+            supabase.table("reward_redemptions")
+            .select("*, rewards(title, points_cost, businesses(name))")
+            .eq("user_id", user_id)
+            .order("redeemed_at", desc=True)
+            .execute()
+        )
+
+        return result.data
+
+    except Exception:
+
+        return []
+
+
+def verify_redemption_code(business_id: str, code: str) -> dict | None:
+    """İşletmenin girdiği kodun geçerli olup olmadığını, kendi ödüllerinden
+    biri için mi olduğunu kontrol eder. Geçerliyse kaydı döner."""
+
+    if not supabase:
+        return None
+
+    try:
+
+        result = (
+            supabase.table("reward_redemptions")
+            .select("*, rewards(title, business_id)")
+            .eq("redemption_code", code)
+            .execute()
+        )
+
+        if not result.data:
+
+            return None
+
+        redemption = result.data[0]
+
+        if redemption["rewards"]["business_id"] != business_id:
+
+            return None
+
+        return redemption
+
+    except Exception:
+
+        return None
+
+
+def mark_redemption_used(redemption_id: str) -> bool:
+    """Ödül kodunu 'kullanıldı' olarak işaretler."""
+
+    if not supabase:
+        return False
+
+    try:
+
+        supabase.table("reward_redemptions").update({"used": True}).eq(
+            "id", redemption_id
+        ).execute()
+
+        return True
+
+    except Exception:
+
+        return False
+
+
+def render_business_panel(business: dict) -> None:
+    """İşletme hesabıyla giriş yapıldığında gösterilen tam ayrı panel."""
+
+    col_title, col_logout = st.columns([4, 1.2])
+
+    with col_title:
+
+        st.title(f"🏪 {business['name']} — İşletme Paneli")
+
+        if business.get("category"):
+
+            st.caption(business["category"])
+
+    with col_logout:
+
+        if st.button("🚪 Çıkış Yap", type="primary", use_container_width=True):
+
+            if supabase:
+
+                try:
+
+                    supabase.auth.sign_out()
+
+                except Exception:
+
+                    pass
+
+            st.session_state.clear()
+            st.rerun()
+
+    st.divider()
+
+    tab_rewards, tab_new, tab_verify = st.tabs(
+        ["🎁 Ödüllerim", "➕ Yeni Ödül Ekle", "✅ Kod Doğrula"]
+    )
+
+    # ------------------------------------------------------
+    # ÖDÜLLERİM
+    # ------------------------------------------------------
+
+    with tab_rewards:
+
+        rewards = load_business_rewards(business["id"])
+
+        if not rewards:
+
+            st.info("Henüz hiç ödül eklemediniz.")
+
+        else:
+
+            for reward in rewards:
+
+                status_label = "🟢 Aktif" if reward.get("is_active") else "⚪ Pasif"
+
+                with st.container(border=True):
+
+                    col_info, col_toggle = st.columns([4, 1])
+
+                    with col_info:
+
+                        st.subheader(f"{reward['title']}  —  {status_label}")
+                        st.caption(f"🏆 {reward['points_cost']} puan")
+
+                        if reward.get("description"):
+
+                            st.write(reward["description"])
+
+                    with col_toggle:
+
+                        if reward.get("is_active"):
+
+                            if st.button(
+                                "Pasife Al",
+                                key=f"deact_reward_{reward['id']}",
+                                use_container_width=True
+                            ):
+
+                                if set_reward_active(reward["id"], False):
+
+                                    st.rerun()
+
+                        else:
+
+                            if st.button(
+                                "Aktif Et",
+                                key=f"act_reward_{reward['id']}",
+                                use_container_width=True
+                            ):
+
+                                if set_reward_active(reward["id"], True):
+
+                                    st.rerun()
+
+    # ------------------------------------------------------
+    # YENİ ÖDÜL EKLE
+    # ------------------------------------------------------
+
+    with tab_new:
+
+        with st.form("new_reward_form", clear_on_submit=True):
+
+            rw_title = st.text_input("Kampanya Adı * (örn: %20 Kahve İndirimi)")
+            rw_description = st.text_area("Açıklama")
+
+            rw_points = st.number_input(
+                "Kaç puana mal olsun?",
+                min_value=1,
+                value=20,
+                step=5
+            )
+
+            submitted_reward = st.form_submit_button(
+                "✅ Ödülü Yayınla", type="primary", use_container_width=True
+            )
+
+        if submitted_reward:
+
+            if not rw_title.strip():
+
+                st.error("Kampanya adı boş olamaz.")
+
+            else:
+
+                success = insert_reward(
+                    business["id"],
+                    {
+                        "title": rw_title.strip(),
+                        "description": rw_description.strip(),
+                        "points_cost": int(rw_points),
+                        "is_active": True
+                    }
+                )
+
+                if success:
+
+                    st.success("Ödül başarıyla yayınlandı!")
+                    st.rerun()
+
+    # ------------------------------------------------------
+    # KOD DOĞRULA (müşteri geldiğinde kasiyer burayı kullanır)
+    # ------------------------------------------------------
+
+    with tab_verify:
+
+        st.write("Müşterinin gösterdiği 6 haneli kodu girin:")
+
+        entered_code = st.text_input("Doğrulama Kodu", max_chars=6, key="verify_code_input")
+
+        if st.button("Kontrol Et", type="primary"):
+
+            if not entered_code.strip():
+
+                st.warning("Lütfen bir kod girin.")
+
+            else:
+
+                redemption = verify_redemption_code(business["id"], entered_code.strip())
+
+                if not redemption:
+
+                    st.error("Kod geçersiz veya bu işletmeye ait değil.")
+
+                elif redemption.get("used"):
+
+                    st.warning("Bu kod daha önce kullanılmış.")
+
+                else:
+
+                    st.success(
+                        f"✅ Geçerli kod! Kampanya: "
+                        f"**{redemption['rewards']['title']}**"
+                    )
+
+                    if st.button("Kullanıldı Olarak İşaretle", type="primary"):
+
+                        if mark_redemption_used(redemption["id"]):
+
+                            st.success("Kod kullanıldı olarak işaretlendi.")
+                            st.rerun()
 
 
 # ============================================================
@@ -1025,6 +1448,15 @@ if "selected_event_id" not in st.session_state:
 
 if "municipality" not in st.session_state:
     st.session_state.municipality = None
+
+if "business" not in st.session_state:
+    st.session_state.business = None
+
+if "last_redemption_code" not in st.session_state:
+    st.session_state.last_redemption_code = None
+
+if "last_redemption_title" not in st.session_state:
+    st.session_state.last_redemption_title = None
 
 
 # ============================================================
@@ -1646,6 +2078,11 @@ else:
         render_municipality_panel(st.session_state.municipality)
         st.stop()
 
+    if st.session_state.get("business"):
+
+        render_business_panel(st.session_state.business)
+        st.stop()
+
     # ========================================================
     # MENÜ
     # ========================================================
@@ -1690,6 +2127,11 @@ else:
             if st.button("🏆 Puanlarım", use_container_width=True):
 
                 st.session_state.sayfa = "🏆 Puanlarım"
+                st.rerun()
+
+            if st.button("🎁 Ödüller", use_container_width=True):
+
+                st.session_state.sayfa = "🎁 Ödüller"
                 st.rerun()
 
             if st.button("📊 İlerlemelerim", use_container_width=True):
@@ -2108,6 +2550,128 @@ else:
                         f"{method_label} ile doğrulandı  •  "
                         f"🏆 +{p.get('points_earned', 0)} puan"
                     )
+
+    # ========================================================
+    # 8E. ÖDÜLLER (YENİ)
+    # ========================================================
+
+    elif st.session_state.sayfa == "🎁 Ödüller":
+
+        st.title("🎁 Ödüller")
+
+        current_points = get_user_total_points(st.session_state.user.id)
+
+        st.metric("Kullanılabilir Puan", current_points)
+
+        st.markdown("---")
+
+        tab_available, tab_history = st.tabs(["🛍️ Mevcut Ödüller", "📜 Geçmiş Taleplerim"])
+
+        # -----------------------------------------------
+        # MEVCUT ÖDÜLLER
+        # -----------------------------------------------
+
+        with tab_available:
+
+            rewards = load_active_rewards()
+
+            if not rewards:
+
+                st.info("Şu an aktif bir ödül bulunmuyor.")
+
+            else:
+
+                for reward in rewards:
+
+                    business_info = reward.get("businesses") or {}
+
+                    with st.container(border=True):
+
+                        col_info, col_action = st.columns([4, 1.2])
+
+                        with col_info:
+
+                            st.subheader(reward["title"])
+                            st.caption(
+                                f"🏪 {business_info.get('name', 'İşletme')}  •  "
+                                f"🏆 {reward['points_cost']} puan"
+                            )
+
+                            if reward.get("description"):
+
+                                st.write(reward["description"])
+
+                        with col_action:
+
+                            can_afford = current_points >= reward["points_cost"]
+
+                            if st.button(
+                                "Talep Et",
+                                key=f"redeem_{reward['id']}",
+                                use_container_width=True,
+                                disabled=not can_afford
+                            ):
+
+                                code = redeem_reward(
+                                    st.session_state.user.id,
+                                    reward["id"],
+                                    reward["points_cost"]
+                                )
+
+                                if code:
+
+                                    st.session_state.last_redemption_code = code
+                                    st.session_state.last_redemption_title = reward["title"]
+                                    st.rerun()
+
+        if st.session_state.get("last_redemption_code"):
+
+            st.success(
+                f"🎉 **{st.session_state.get('last_redemption_title')}** talep edildi! "
+                f"İşletmede şu kodu göster:"
+            )
+
+            st.markdown(
+                f"<h1 style='text-align:center;letter-spacing:0.3em;'>"
+                f"{st.session_state.last_redemption_code}</h1>",
+                unsafe_allow_html=True
+            )
+
+            if st.button("Kapat"):
+
+                st.session_state.last_redemption_code = None
+                st.session_state.last_redemption_title = None
+                st.rerun()
+
+        # -----------------------------------------------
+        # GEÇMİŞ TALEPLERİM
+        # -----------------------------------------------
+
+        with tab_history:
+
+            redemptions = load_user_redemptions(st.session_state.user.id)
+
+            if not redemptions:
+
+                st.info("Henüz hiç ödül talep etmedin.")
+
+            else:
+
+                for r in redemptions:
+
+                    reward_info = r.get("rewards") or {}
+                    business_info = (reward_info.get("businesses") or {})
+
+                    used_label = "✅ Kullanıldı" if r.get("used") else "⏳ Bekliyor"
+
+                    with st.container(border=True):
+
+                        st.write(f"**{reward_info.get('title', 'Ödül')}** — {used_label}")
+                        st.caption(
+                            f"🏪 {business_info.get('name', '')}  •  "
+                            f"Kod: {r.get('redemption_code', '')}  •  "
+                            f"🏆 {reward_info.get('points_cost', 0)} puan"
+                        )
 
     # ========================================================
     # 9. İLERLEMELER
