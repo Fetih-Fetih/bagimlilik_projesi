@@ -6,9 +6,33 @@ import uuid
 import re
 import math
 import io
+import os
 import qrcode
 import pandas as pd
 from datetime import datetime, date, timedelta
+
+
+# ============================================================
+# 0. GİZLİ ANAHTARLARI OKUMA (Streamlit Cloud + Render uyumlu)
+# ============================================================
+# Streamlit Cloud'da .streamlit/secrets.toml kullanılır (st.secrets).
+# Render gibi platformlarda ise normal ortam değişkeni (os.environ)
+# kullanılır. İkisini de destekleyelim ki kod her yerde çalışsın.
+
+def get_secret(key: str, default: str = "") -> str:
+
+    try:
+
+        value = st.secrets.get(key)
+
+        if value:
+            return value
+
+    except Exception:
+
+        pass
+
+    return os.environ.get(key, default)
 
 
 # ============================================================
@@ -107,8 +131,8 @@ def get_supabase_client() -> Client | None:
 
     try:
 
-        url = st.secrets.get("SUPABASE_URL", "").strip().rstrip("/")
-        key = st.secrets.get("SUPABASE_KEY", "").strip()
+        url = get_secret("SUPABASE_URL").strip().rstrip("/")
+        key = get_secret("SUPABASE_KEY").strip()
 
         if not url or not key:
             return None
@@ -2234,7 +2258,7 @@ else:
         # GROQ
         # ====================================================
 
-        GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "").strip()
+        GROQ_API_KEY = get_secret("GROQ_API_KEY").strip()
 
         if not GROQ_API_KEY:
 
