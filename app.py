@@ -1,7 +1,8 @@
 import streamlit as st
 import streamlit.components.v1 as components
 from supabase import create_client, Client
-from groq import Groq
+from openai import OpenAI
+from PIL import Image
 import uuid
 import re
 import math
@@ -10,6 +11,28 @@ import os
 import qrcode
 import pandas as pd
 from datetime import datetime, date, timedelta
+
+
+# ============================================================
+# 0B. LOGO
+# ============================================================
+
+LOGO_PATH = "assets/logo.png"
+
+
+def get_logo():
+    """Logo dosyasını güvenli şekilde yükler, yoksa None döner."""
+
+    try:
+
+        return Image.open(LOGO_PATH)
+
+    except Exception:
+
+        return None
+
+
+APP_LOGO = get_logo()
 
 
 # ============================================================
@@ -40,8 +63,8 @@ def get_secret(key: str, default: str = "") -> str:
 # ============================================================
 
 st.set_page_config(
-    page_title="Alışkanlık Asistanı",
-    page_icon="🌱",
+    page_title="Relive",
+    page_icon=APP_LOGO if APP_LOGO else "🌱",
     layout="wide"
 )
 
@@ -1661,7 +1684,17 @@ if not st.session_state.user:
 
     with col_logo:
 
-        st.markdown("### 🌱 **Karakter & Alışkanlık Koçu**")
+        logo_col, title_col = st.columns([1, 5])
+
+        with logo_col:
+
+            if APP_LOGO:
+
+                st.image(APP_LOGO, width=48)
+
+        with title_col:
+
+            st.markdown("### **Relive** — Karakter & Alışkanlık Koçu")
 
     with col_login:
 
@@ -2119,6 +2152,10 @@ else:
 
         with st.popover("☰ Menü", use_container_width=True):
 
+            if APP_LOGO:
+
+                st.image(APP_LOGO, width=56)
+
             st.markdown("### 📌 Menü")
 
             if st.session_state.avatar_url:
@@ -2214,7 +2251,17 @@ else:
 
         with col_title:
 
-            st.title("🌱 Alışkanlık & Motivasyon Asistanı")
+            title_logo_col, title_text_col = st.columns([1, 8])
+
+            with title_logo_col:
+
+                if APP_LOGO:
+
+                    st.image(APP_LOGO, width=44)
+
+            with title_text_col:
+
+                st.title("Alışkanlık & Motivasyon Asistanı")
 
         with col_new_btn:
 
@@ -2258,15 +2305,15 @@ else:
         # GROQ
         # ====================================================
 
-        GROQ_API_KEY = get_secret("GROQ_API_KEY").strip()
+        GROQ_API_KEY = get_secret("OPENAI_API_KEY").strip()
 
         if not GROQ_API_KEY:
 
-            st.error("GROQ_API_KEY bulunamadı.")
+            st.error("OPENAI_API_KEY bulunamadı.")
 
         else:
 
-            client = Groq(api_key=GROQ_API_KEY)
+            client = OpenAI(api_key=GROQ_API_KEY)
 
             current_messages = []
 
@@ -2411,7 +2458,7 @@ else:
 
                         chat_completion = client.chat.completions.create(
                             messages=api_messages,
-                            model="openai/gpt-oss-120b"
+                            model="gpt-4o-mini"
                         )
 
                         ai_reply = chat_completion.choices[0].message.content
