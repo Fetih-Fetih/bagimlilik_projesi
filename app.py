@@ -2500,16 +2500,16 @@ else:
 
         st.markdown("<br><br>", unsafe_allow_html=True)
 
-        _, chat_launcher_col = st.columns([3, 2])
+        _, chat_launcher_col = st.columns([4, 1.5])
 
         with chat_launcher_col:
-            with st.container(border=True):
-                st.markdown("### 💬 AI ile kişisel sohbet etmek istiyorum")
-                st.caption("Aklındaki konuyu yaz, AI koçunla birlikte düşün.")
-
-                if st.button("Sohbeti aç", key="open_chat_home", use_container_width=True):
-                    st.session_state.sayfa = "🌱 AI Koç & Sohbet"
-                    st.rerun()
+            if st.button(
+                "💬 AI ile kişisel sohbet etmek istiyorum",
+                key="open_chat_home",
+                use_container_width=True
+            ):
+                st.session_state.sayfa = "🌱 AI Koç & Sohbet"
+                st.rerun()
 
     # ========================================================
     # 8B. AI KOÇ & SOHBET
