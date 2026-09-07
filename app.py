@@ -178,15 +178,44 @@ section[data-testid="stSidebar"] {
 }
 
 .menu-button button {
-    background-color: #2e7d32 !important;
+    background: linear-gradient(135deg, #0e7490, #155e9c) !important;
     color: white !important;
     font-weight: bold !important;
-    border: none !important;
+    border: 1px solid rgba(115, 220, 255, 0.55) !important;
     border-radius: 8px !important;
 }
 
 .stButton > button {
     border-radius: 8px;
+    border-color: rgba(55, 177, 210, 0.45);
+}
+
+.stButton > button:hover {
+    border-color: rgba(83, 213, 231, 0.85);
+    color: #dffaff;
+}
+
+.stApp {
+    background: linear-gradient(135deg, #06101f, #0a1e35 52%, #073d52);
+    color: #e6f8ff;
+}
+
+[data-testid="stAppViewContainer"],
+[data-testid="stMain"] {
+    background: transparent;
+}
+
+[data-testid="stTextInput"] input,
+[data-testid="stTextArea"] textarea,
+[data-testid="stNumberInput"] input,
+[data-testid="stDateInput"] input {
+    background: rgba(8, 28, 49, 0.82);
+    color: #e6f8ff;
+    border-color: rgba(69, 188, 216, 0.45);
+}
+
+[data-testid="stCaptionContainer"] {
+    color: #9ed8ea;
 }
 
 .compact-home-button button {
@@ -218,8 +247,8 @@ section[data-testid="stSidebar"] {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 58px;
-    height: 58px;
+    width: 76px;
+    height: 76px;
     border: 2px solid #83c8ff;
     border-radius: 18px;
     background: linear-gradient(145deg, #1c72c2, #081326);
@@ -1707,12 +1736,13 @@ def trigger_geolocation_participation(event_id: str) -> None:
 
     js = f"""
     <button id="loc-btn" style="
-        background-color:#2e7d32;color:white;border:none;
+        background:linear-gradient(135deg,#0e7490,#155e9c);color:white;
+        border:1px solid rgba(115,220,255,0.55);
         padding:0.6rem 1rem;border-radius:8px;font-weight:bold;
         cursor:pointer;width:100%;">
         📍 Konumumla Katıl
     </button>
-    <p id="loc-status" style="font-size:0.85rem;color:#555;"></p>
+    <p id="loc-status" style="font-size:0.85rem;color:#9ed8ea;"></p>
     <script>
     document.getElementById('loc-btn').addEventListener('click', function() {{
         document.getElementById('loc-status').innerText = 'Konum alınıyor...';
@@ -2302,13 +2332,18 @@ if not st.session_state.user:
     with col_logo:
 
         logo_markup = (
-            f"<img src='{APP_LOGO_DATA_URI}' width='58' height='58' alt='Relive'>"
+            f"<img src='{APP_LOGO_DATA_URI}' width='76' height='76' alt='Relive'>"
             if APP_LOGO_DATA_URI
             else "<span class='landing-logo-fallback'>R</span>"
         )
         st.markdown(
             f"""
-            <a class="landing-logo-link" href="?home=1" aria-label="Ana sayfa">
+            <a
+                class="landing-logo-link"
+                href="#"
+                aria-label="Ana sayfa"
+                onclick="window.top.location.href = window.top.location.pathname + '?home=1'; return false;"
+            >
                 {logo_markup}
             </a>
             """,
@@ -2839,10 +2874,6 @@ else:
         st.markdown('<div class="menu-button">', unsafe_allow_html=True)
 
         with st.popover("☰ Menü", use_container_width=True):
-
-            if APP_LOGO:
-
-                st.image(APP_LOGO, width=56)
 
             st.markdown("### 📌 Menü")
 
