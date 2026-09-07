@@ -443,7 +443,7 @@ def apply_auth_session(user, session) -> None:
 
     st.session_state.chats = load_chats_from_db(user.id)
     st.session_state.current_chat_id = None
-    st.session_state.sayfa = "🌱 AI Koç & Sohbet"
+    st.session_state.sayfa = "Ana Ekran"
     st.session_state.show_auth_modal = False
 
     st.session_state.municipality = get_municipality_info(user.id)
@@ -550,6 +550,38 @@ def render_hobby_recommendations(mood: str | None = None):
                     st.session_state.selected_event_id = event["id"]
                     st.session_state.sayfa = "📍 Etkinlik Detay"
                     st.rerun()
+
+
+def generate_mood_recommendation(display_name: str, mood: str) -> str | None:
+    """Seçilen ruh haline ve hobilere göre tek seferlik AI önerisi üretir."""
+
+    client = get_ai_client()
+
+    if not client:
+        return None
+
+    prompt = build_system_prompt(display_name, mood)
+    prompt += (
+        "\n\nKullanıcı ana ekranda ruh halini seçti. Ona doğrudan ve sıcak bir dille "
+        "kısa bir öneri ver. Seçtiği hobilerden en fazla bir veya iki tanesini kullan. "
+        "Şehirindeki gerçek etkinlikleri varsa isimleriyle, tarihleriyle ve neden uygun "
+        "olduğuyla öner. Olmayan etkinlik uydurma. Yanıtı en fazla 5 cümle tut."
+    )
+
+    try:
+        response = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": f"Şu an {mood} hissediyorum. Bana öneri ver."}
+            ],
+            model="gpt-4o-mini"
+        )
+
+        return response.choices[0].message.content
+
+    except Exception as error:
+        st.error(f"AI önerisi alınamadı: {error}")
+        return None
 
 
 def build_system_prompt(display_name: str, mood: str | None) -> str:
@@ -1653,7 +1685,7 @@ if "gun_sayisi" not in st.session_state:
     st.session_state.gun_sayisi = 1
 
 if "sayfa" not in st.session_state:
-    st.session_state.sayfa = "🌱 AI Koç & Sohbet"
+    st.session_state.sayfa = "Ana Ekran"
 
 if "profile_name" not in st.session_state:
     st.session_state.profile_name = ""
@@ -1675,6 +1707,9 @@ if "hobbies" not in st.session_state:
 
 if "mood" not in st.session_state:
     st.session_state.mood = None
+
+if "mood_recommendation" not in st.session_state:
+    st.session_state.mood_recommendation = None
 
 if "selected_event_id" not in st.session_state:
     st.session_state.selected_event_id = None
@@ -2428,10 +2463,59 @@ else:
         st.markdown('</div>', unsafe_allow_html=True)
 
     # ========================================================
-    # 8. AI KOÇ & SOHBET
+    # 8. ANA EKRAN
     # ========================================================
 
-    if st.session_state.sayfa == "🌱 AI Koç & Sohbet":
+    if st.session_state.sayfa == "Ana Ekran":
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.title(f"Hoş geldin, {display_name} 👋")
+        st.caption("Bugün nasıl hissediyorsun? Sana uygun bir öneri hazırlayayım.")
+
+        mood_cols = st.columns(len(MOOD_OPTIONS))
+
+        for mood_col, (mood_name, mood_emoji) in zip(mood_cols, MOOD_OPTIONS.items()):
+
+            with mood_col:
+
+                if st.button(
+                    f"{mood_emoji} {mood_name}",
+                    key=f"home_mood_{mood_name}",
+                    type="primary" if st.session_state.mood == mood_name else "secondary",
+                    use_container_width=True
+                ):
+
+                    st.session_state.mood = mood_name
+
+                    with st.spinner("Sana özel önerin hazırlanıyor..."):
+                        st.session_state.mood_recommendation = generate_mood_recommendation(
+                            display_name, mood_name
+                        )
+
+                    st.rerun()
+
+        if st.session_state.mood_recommendation:
+            st.markdown("### 🤖 AI önerin")
+            st.info(st.session_state.mood_recommendation)
+
+        st.markdown("<br><br>", unsafe_allow_html=True)
+
+        _, chat_launcher_col = st.columns([3, 2])
+
+        with chat_launcher_col:
+            with st.container(border=True):
+                st.markdown("### 💬 AI ile kişisel sohbet etmek istiyorum")
+                st.caption("Aklındaki konuyu yaz, AI koçunla birlikte düşün.")
+
+                if st.button("Sohbeti aç", key="open_chat_home", use_container_width=True):
+                    st.session_state.sayfa = "🌱 AI Koç & Sohbet"
+                    st.rerun()
+
+    # ========================================================
+    # 8B. AI KOÇ & SOHBET
+    # ========================================================
+
+    elif st.session_state.sayfa == "🌱 AI Koç & Sohbet":
 
         col_title, col_new_btn = st.columns([4, 1.2])
 
