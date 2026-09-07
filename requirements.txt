@@ -1,5 +1,5 @@
 streamlit
-openai
+requests
 supabase
 extra-streamlit-components
 qrcode[pil]

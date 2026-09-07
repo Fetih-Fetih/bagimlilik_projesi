@@ -1,7 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as components
 from supabase import create_client, Client
-from google import genai
 from PIL import Image
 import uuid
 import re
@@ -9,6 +8,7 @@ import math
 import io
 import os
 import qrcode
+import requests
 import pandas as pd
 from datetime import datetime, date, timedelta
 
@@ -539,15 +539,28 @@ def apply_auth_session(user, session) -> None:
 
 
 
-def get_ai_client():
-    """Gemini istemcisini güvenli şekilde oluşturur, anahtar yoksa None döner."""
+def generate_gemini_content(prompt: str) -> str | None:
+    """Gemini REST API üzerinden metin üretir; SDK/namespace çakışmalarını önler."""
 
     api_key = get_secret("GEMINI_API_KEY").strip()
 
     if not api_key:
         return None
 
-    return genai.Client(api_key=api_key)
+    endpoint = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"gemini-2.5-flash:generateContent?key={api_key}"
+    )
+
+    response = requests.post(
+        endpoint,
+        json={"contents": [{"parts": [{"text": prompt}]}]},
+        timeout=60
+    )
+    response.raise_for_status()
+
+    response_data = response.json()
+    return response_data["candidates"][0]["content"]["parts"][0]["text"]
 
 
 def get_hobby_related_events(hobbies: list[str], city: str | None = None, limit: int = 4) -> list[dict]:
@@ -644,9 +657,7 @@ def render_hobby_recommendations(mood: str | None = None):
 def generate_mood_recommendation(display_name: str, mood: str) -> str | None:
     """Seçilen ruh haline ve hobilere göre tek seferlik AI önerisi üretir."""
 
-    client = get_ai_client()
-
-    if not client:
+    if not get_secret("GEMINI_API_KEY").strip():
         return None
 
     prompt = build_system_prompt(display_name, mood)
@@ -658,15 +669,10 @@ def generate_mood_recommendation(display_name: str, mood: str) -> str | None:
     )
 
     try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=(
-                f"{prompt}\n\n"
-                f"Kullanıcı mesajı: Şu an {mood} hissediyorum. Bana öneri ver."
-            )
+        return generate_gemini_content(
+            f"{prompt}\n\n"
+            f"Kullanıcı mesajı: Şu an {mood} hissediyorum. Bana öneri ver."
         )
-
-        return response.text
 
     except Exception as error:
         st.error(f"AI önerisi alınamadı: {error}")
@@ -2679,9 +2685,6 @@ else:
             st.error("GEMINI_API_KEY bulunamadı.")
 
         else:
-
-            client = get_ai_client()
-
             current_messages = []
 
             if (
@@ -2820,17 +2823,12 @@ else:
                             for msg in st.session_state.chats[chat_id]["messages"]
                         )
 
-                        chat_completion = client.models.generate_content(
-                            model="gemini-2.5-flash",
-                            contents=(
-                                f"{system_prompt}\n\n"
-                                "Aşağıdaki sohbet geçmişine göre son kullanıcı mesajına cevap ver. "
-                                "Cevabın sıcak, kısa ve uygulanabilir olsun.\n\n"
-                                f"{conversation_text}"
-                            )
+                        ai_reply = generate_gemini_content(
+                            f"{system_prompt}\n\n"
+                            "Aşağıdaki sohbet geçmişine göre son kullanıcı mesajına cevap ver. "
+                            "Cevabın sıcak, kısa ve uygulanabilir olsun.\n\n"
+                            f"{conversation_text}"
                         )
-
-                        ai_reply = chat_completion.text
 
                         st.markdown(ai_reply)
 
