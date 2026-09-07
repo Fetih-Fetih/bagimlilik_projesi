@@ -425,6 +425,76 @@ def apply_auth_session(user, session) -> None:
     st.session_state.business = get_business_info(user.id)
 
 
+def get_ai_client() -> OpenAI | None:
+    """OpenAI istemcisini güvenli şekilde oluşturur, anahtar yoksa None döner."""
+
+    api_key = get_secret("OPENAI_API_KEY").strip()
+
+    if not api_key:
+        return None
+
+    return OpenAI(api_key=api_key)
+
+
+def build_system_prompt(display_name: str, mood: str | None) -> str:
+    """Kullanıcı bilgilerine ve gerçek etkinliklere göre sistem promptu oluşturur."""
+
+    system_prompt = (
+        "Sen bir motivasyon ve alışkanlık koçusun. "
+        f"Kullanıcı adı: {display_name}. "
+        f"Yaşadığı şehir: {st.session_state.city}. "
+    )
+
+    if st.session_state.hobbies:
+
+        system_prompt += (
+            f"İlgi alanları: {', '.join(st.session_state.hobbies)}. "
+        )
+
+    if mood:
+
+        system_prompt += (
+            f"Şu anki ruh hali: {mood}. "
+            "Cevaplarını ve önerilerini bu ruh haline, "
+            "şehrine ve ilgi alanlarına göre kişiselleştir."
+        )
+
+    nearby_events = load_active_events(city=st.session_state.city)
+
+    if nearby_events:
+
+        events_text = "\n".join(
+            f"- {e['title']} | Kategori: {e.get('category', 'Belirtilmemiş')} | "
+            f"Tarih: {e['event_date']} {e['event_time']} | "
+            f"Yer: {e.get('address', e['city'])} | "
+            f"Katılım ödülü: {e.get('points_reward', 10)} puan"
+            for e in nearby_events[:15]
+        )
+
+        system_prompt += (
+            "\n\nKullanıcının şehrinde şu anda gerçekleşecek "
+            "gerçek etkinlikler var:\n"
+            f"{events_text}\n\n"
+            "Kullanıcının ruh haline ve ilgi alanlarına en uygun "
+            "olan 1-3 etkinliği isimleriyle, tarihleriyle ve "
+            "neden uygun olduğunu açıklayarak öner. Etkinlik "
+            "önerirken bu listede OLMAYAN bir etkinlik uydurma. "
+            "Kullanıcıya, etkinliğin tüm detaylarını ve katılım "
+            "onayını uygulamadaki '📍 Etkinlikler' sayfasından "
+            "görebileceğini hatırlat."
+        )
+
+    else:
+
+        system_prompt += (
+            "\n\nKullanıcının şehrinde şu an aktif bir etkinlik "
+            "bulunmuyor. Bunu nazikçe belirt ve genel bir "
+            "alışkanlık/motivasyon önerisi ver."
+        )
+
+    return system_prompt
+
+
 # ============================================================
 # 4B. ETKİNLİK YARDIMCI FONKSİYONLARI (YENİ)
 # ============================================================
