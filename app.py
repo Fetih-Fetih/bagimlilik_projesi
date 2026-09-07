@@ -1,5 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as components
+import extra_streamlit_components as stx
 from supabase import create_client, Client
 from PIL import Image
 import uuid
@@ -287,29 +288,25 @@ supabase = get_supabase_client()
 AUTH_COOKIE_NAME = "habit_coach_refresh_token"
 AUTH_QUERY_PARAM = "auth_token"
 
+cookie_manager = stx.CookieManager(key="relive_auth_cookie")
+
 
 def set_browser_cookie(name: str, value: str, days: int = 30) -> None:
-    """Tarayıcıya doğrudan JS ile kalıcı çerez yazar."""
+    """Ana uygulama alanına kalıcı tarayıcı çerezi yazar."""
 
-    js = f"""
-    <script>
-    document.cookie = "{name}={value}; max-age={days * 24 * 60 * 60}; path=/; SameSite=Lax";
-    </script>
-    """
-
-    components.html(js, height=0, width=0)
+    cookie_manager.set(
+        name,
+        value,
+        max_age=days * 24 * 60 * 60,
+        path="/",
+        same_site="lax"
+    )
 
 
 def delete_browser_cookie(name: str) -> None:
-    """Tarayıcıdaki çerezi siler."""
+    """Ana uygulama alanındaki tarayıcı çerezini siler."""
 
-    js = f"""
-    <script>
-    document.cookie = "{name}=; max-age=0; path=/; SameSite=Lax";
-    </script>
-    """
-
-    components.html(js, height=0, width=0)
+    cookie_manager.delete(name)
 
 
 def inject_cookie_check_redirect(name: str, query_param: str) -> None:
@@ -2017,6 +2014,9 @@ if st.session_state.user is None and not st.session_state.get("auth_restore_done
 
     token_from_url = st.query_params.get(AUTH_QUERY_PARAM)
 
+    if not token_from_url:
+        token_from_url = cookie_manager.get(AUTH_COOKIE_NAME)
+
     if token_from_url:
 
         st.session_state.auth_restore_done = True
@@ -2040,14 +2040,6 @@ if st.session_state.user is None and not st.session_state.get("auth_restore_done
 
         st.query_params.clear()
         st.rerun()
-
-    else:
-
-        if not st.session_state.get("cookie_check_injected", False):
-
-            st.session_state.cookie_check_injected = True
-
-            inject_cookie_check_redirect(AUTH_COOKIE_NAME, AUTH_QUERY_PARAM)
 
 
 # ============================================================
