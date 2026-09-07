@@ -540,21 +540,45 @@ def apply_auth_session(user, session) -> None:
 
 
 def generate_gemini_content(prompt: str) -> str | None:
-    """Gemini REST API üzerinden metin üretir; SDK/namespace çakışmalarını önler."""
+    """Gemini REST API üzerinden, anahtarın desteklediği modelle metin üretir."""
 
     api_key = get_secret("GEMINI_API_KEY").strip()
 
     if not api_key:
         return None
 
-    endpoint = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        "gemini-2.0-flash:generateContent"
-    )
-
     try:
+        models_response = requests.get(
+            "https://generativelanguage.googleapis.com/v1beta/models",
+            params={"key": api_key},
+            timeout=30
+        )
+        models_response.raise_for_status()
+
+        available_models = [
+            model["name"].removeprefix("models/")
+            for model in models_response.json().get("models", [])
+            if "generateContent" in model.get("supportedGenerationMethods", [])
+        ]
+
+        preferred_models = [
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+            "gemini-2.0-flash-lite",
+            "gemini-1.5-flash"
+        ]
+        selected_model = next(
+            (model for model in preferred_models if model in available_models),
+            next((model for model in available_models if "flash" in model), None)
+        )
+
+        if not selected_model:
+            st.error("Bu Gemini API anahtarı için kullanılabilir bir metin modeli bulunamadı.")
+            return None
+
         response = requests.post(
-            endpoint,
+            f"https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{selected_model}:generateContent",
             params={"key": api_key},
             json={"contents": [{"parts": [{"text": prompt}]}]},
             timeout=60
@@ -562,8 +586,9 @@ def generate_gemini_content(prompt: str) -> str | None:
         response.raise_for_status()
 
     except requests.HTTPError as error:
+        status_code = error.response.status_code if error.response is not None else "bilinmiyor"
         st.error(
-            f"Gemini API hatası ({error.response.status_code}). "
+            f"Gemini API hatası ({status_code}). "
             "API anahtarını ve Gemini API erişimini kontrol edin."
         )
         return None
