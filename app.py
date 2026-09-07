@@ -95,11 +95,36 @@ HOBBY_OPTIONS = [
     "Fotoğrafçılık", "Gezi & kültür", "Gönüllülük & sosyal sorumluluk"
 ]
 
+HOBBY_MATCH_KEYWORDS = {
+    "Spor": ["spor", "fitness", "koşu", "yürüyüş", "maraton", "saha", "açık hava", "egzersiz"],
+    "Dans": ["dans", "performans", "ritim", "müzik", "sahne"],
+    "Müzik": ["müzik", "konser", "orkestra", "çalgı", "sahne", "festival"],
+    "Sanat": ["sanat", "sergi", "galeri", "resim", "heykel", "tasarım", "yaratıcılık"],
+    "Kitap & edebiyat": ["kitap", "edebiyat", "yazar", "okuma", "kütüphane", "roman", "şiir"],
+    "Sinema & tiyatro": ["sinema", "tiyatro", "film", "sahne", "seans", "festival"],
+    "Astronomi & uzay": ["astronomi", "uzay", "gökyüzü", "uydu", "teleskop", "gözlem"],
+    "Bilim & teknoloji": ["bilim", "teknoloji", "start-up", "hackathon", "teknoloji", "geliştirme"],
+    "Doğa & kamp": ["doğa", "kamp", "ağaç", "orman", "yürüyüş", "açık hava", "nehir", "dağ"],
+    "Yemek & gastronomi": ["yemek", "gastronomi", "lezzet", "mutfak", "pasta", "restoran", "tatlı"],
+    "El sanatları & tasarım": ["el sanatları", "tasarım", "örnek", "zanaat", "kültür", "üretim"],
+    "Oyun & masa oyunları": ["oyun", "masa", "board", "estrateji", "turnuva", "takım"],
+    "Fotoğrafçılık": ["fotoğraf", "çekim", "kamera", "gece", "görüntü", "sabah"],
+    "Gezi & kültür": ["gezi", "kültür", "müze", "tarih", "tur", "sokak", "festivale"],
+    "Gönüllülük & sosyal sorumluluk": ["gönüllülük", "sosyal", "yardım", "toplum", "etkinlik", "çevre"]
+}
+
 MOOD_OPTIONS = {
     "Enerjik": "⚡",
     "Üzgün": "😔",
     "Stresli": "😖",
     "Yorgun": "🥱"
+}
+
+MOOD_ACTIVITY_SUGGESTIONS = {
+    "Enerjik": "Bugünkü enerjini hobilerinden biriyle ilgili hareketli bir etkinliğe ayır.",
+    "Üzgün": "Kendini zorlamadan, hobilerinden biriyle ilgili keyifli ve sosyal bir etkinlik seç.",
+    "Stresli": "Kısa ve sakin bir hobi aktivitesiyle başlayıp zihnini biraz dinlendirebilirsin.",
+    "Yorgun": "Düşük tempolu, seni dinlendirecek bir hobi etkinliği sana daha iyi gelebilir."
 }
 
 
@@ -434,6 +459,97 @@ def get_ai_client() -> OpenAI | None:
         return None
 
     return OpenAI(api_key=api_key)
+
+
+def get_hobby_related_events(hobbies: list[str], city: str | None = None, limit: int = 4) -> list[dict]:
+    """Kullanıcının seçtiği hobilerle eşleşen etkinlikleri skorlayarak döndürür."""
+
+    events = load_active_events(city=city)
+
+    if not hobbies:
+        return events[:limit]
+
+    scored_events = []
+
+    for event in events:
+        text = " ".join([
+            str(event.get("title", "")),
+            str(event.get("description", "")),
+            str(event.get("category", "")),
+            str(event.get("city", "")),
+            str(event.get("address", ""))
+        ]).lower()
+
+        score = 0
+
+        for hobby in hobbies:
+            hobby_lower = hobby.lower()
+            category = str(event.get("category", "")).lower()
+
+            if hobby_lower == category or hobby_lower in category:
+                score += 5
+
+            for keyword in HOBBY_MATCH_KEYWORDS.get(hobby, []):
+                if keyword.lower() in text:
+                    score += 2
+
+            if hobby_lower in text:
+                score += 1
+
+        if score > 0:
+            scored_events.append({**event, "_score": score})
+
+    if not scored_events:
+        return events[:limit]
+
+    scored_events.sort(key=lambda item: (item["_score"], item.get("event_date", ""), item.get("event_time", "")), reverse=True)
+
+    return [{k: v for k, v in item.items() if k != "_score"} for item in scored_events[:limit]]
+
+
+def render_hobby_recommendations(mood: str | None = None):
+    """Hobi ve seçilen ruh haline göre etkinlik önerilerini gösterir."""
+
+    hobbies = st.session_state.get("hobbies", [])
+
+    if not hobbies:
+        st.info("Henüz hobi seçimi yapmadın; buna göre öneri göstermek için profilinden ilgi alanlarını ekleyebilirsin.")
+        return
+
+    recommended_events = get_hobby_related_events(hobbies, city=st.session_state.get("city"), limit=3)
+
+    st.subheader("🎯 Sana özel öneriler")
+    st.caption(f"Seçtiğin alanlar: {', '.join(hobbies)}")
+
+    if mood and mood in MOOD_ACTIVITY_SUGGESTIONS:
+        st.info(f"{MOOD_OPTIONS[mood]} {mood}: {MOOD_ACTIVITY_SUGGESTIONS[mood]}")
+
+    if not recommended_events:
+        st.info("Bu hobiler için şu an şehirinde uygun bir etkinlik görünmüyor. Fakat ben sana benzer bir aktivite yönlendirebilirim.")
+        return
+
+    for event in recommended_events:
+        with st.container(border=True):
+            col_info, col_action = st.columns([4, 1.2])
+
+            with col_info:
+                st.markdown(f"**{event.get('title', 'Etkinlik')}**")
+                st.caption(
+                    f"📅 {event.get('event_date', '')} • 🕐 {event.get('event_time', '')} • "
+                    f"📍 {event.get('address', event.get('city', ''))}"
+                )
+
+                if event.get("category"):
+                    st.badge(event["category"])
+
+                if event.get("description"):
+                    st.write(event["description"])
+
+            with col_action:
+                if st.button("Detay", key=f"hobby_rec_{event['id']}", use_container_width=True):
+                    st.session_state.selected_event_id = event["id"]
+                    st.session_state.sayfa = "📍 Etkinlik Detay"
+                    st.rerun()
 
 
 def build_system_prompt(display_name: str, mood: str | None) -> str:
@@ -2371,6 +2487,8 @@ else:
 
         st.markdown("")
 
+        render_hobby_recommendations(st.session_state.get("mood"))
+
         # ====================================================
         # GROQ
         # ====================================================
@@ -2554,6 +2672,8 @@ else:
         deactivate_expired_events()
 
         st.title("📍 Yakınındaki Etkinlikler")
+
+        render_hobby_recommendations()
 
         show_only_my_city = st.checkbox(
             f"Sadece {st.session_state.city} şehrindekileri göster",
