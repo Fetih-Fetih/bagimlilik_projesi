@@ -190,36 +190,36 @@ section[data-testid="stSidebar"] {
     }
 }
 
-body:has(.home-screen) .stApp {
+body:has(.home-screen, .landing-screen) .stApp {
     background: linear-gradient(125deg, #05070d, #0b1b35, #123d70, #07101f);
     background-size: 320% 320%;
     animation: relive-gradient-shift 18s ease infinite;
     color: #f4f8ff;
 }
 
-body:has(.home-screen) [data-testid="stAppViewContainer"],
-body:has(.home-screen) [data-testid="stMain"] {
+body:has(.home-screen, .landing-screen) [data-testid="stAppViewContainer"],
+body:has(.home-screen, .landing-screen) [data-testid="stMain"] {
     background: transparent;
 }
 
-body:has(.home-screen) [data-testid="stHeader"] {
+body:has(.home-screen, .landing-screen) [data-testid="stHeader"] {
     background: transparent;
 }
 
-body:has(.home-screen) .stApp [data-testid="stMainBlockContainer"] {
+body:has(.home-screen, .landing-screen) .stApp [data-testid="stMainBlockContainer"] {
     animation: relive-fade-up 0.7s ease-out both;
 }
 
-body:has(.home-screen) .stApp h1,
-body:has(.home-screen) .stApp h2,
-body:has(.home-screen) .stApp h3,
-body:has(.home-screen) .stApp p,
-body:has(.home-screen) .stApp label,
-body:has(.home-screen) .stApp [data-testid="stCaptionContainer"] {
+body:has(.home-screen, .landing-screen) .stApp h1,
+body:has(.home-screen, .landing-screen) .stApp h2,
+body:has(.home-screen, .landing-screen) .stApp h3,
+body:has(.home-screen, .landing-screen) .stApp p,
+body:has(.home-screen, .landing-screen) .stApp label,
+body:has(.home-screen, .landing-screen) .stApp [data-testid="stCaptionContainer"] {
     color: #f4f8ff !important;
 }
 
-body:has(.home-screen) .stApp [data-testid="stButton"] button {
+body:has(.home-screen, .landing-screen) .stApp [data-testid="stButton"] button {
     min-height: 3.2rem;
     border: 1px solid rgba(171, 211, 255, 0.28) !important;
     background: rgba(9, 21, 40, 0.68) !important;
@@ -228,26 +228,26 @@ body:has(.home-screen) .stApp [data-testid="stButton"] button {
     transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
 
-body:has(.home-screen) .stApp [data-testid="stButton"] button:hover {
+body:has(.home-screen, .landing-screen) .stApp [data-testid="stButton"] button:hover {
     transform: translateY(-3px);
     background: rgba(25, 86, 150, 0.82) !important;
     border-color: rgba(179, 222, 255, 0.8) !important;
     box-shadow: 0 14px 30px rgba(4, 23, 53, 0.55);
 }
 
-body:has(.home-screen) .stApp [data-testid="stButton"] button[kind="primary"] {
+body:has(.home-screen, .landing-screen) .stApp [data-testid="stButton"] button[kind="primary"] {
     background: linear-gradient(135deg, #1e6fc5, #164b94) !important;
     border-color: #86c7ff !important;
 }
 
-body:has(.home-screen) .stApp [data-testid="stAlert"] {
+body:has(.home-screen, .landing-screen) .stApp [data-testid="stAlert"] {
     background: rgba(13, 40, 73, 0.72) !important;
     border: 1px solid rgba(143, 205, 255, 0.4) !important;
     color: #f4f8ff !important;
     border-radius: 14px;
 }
 
-body:has(.home-screen) .stApp [data-testid="stVerticalBlockBorderWrapper"] {
+body:has(.home-screen, .landing-screen) .stApp [data-testid="stVerticalBlockBorderWrapper"] {
     border-color: rgba(143, 205, 255, 0.3) !important;
     background: rgba(6, 18, 35, 0.34);
 }
@@ -2351,6 +2351,7 @@ if not st.session_state.user:
     # ANA EKRAN
     # ========================================================
 
+    st.markdown("<div class='landing-screen'></div>", unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
 
     st.markdown(
