@@ -7,6 +7,7 @@ import uuid
 import re
 import math
 import io
+import base64
 import os
 import qrcode
 import requests
@@ -34,6 +35,22 @@ def get_logo():
 
 
 APP_LOGO = get_logo()
+
+
+def get_logo_data_uri() -> str:
+    """Logoyu tıklanabilir HTML içinde kullanılabilecek veri URI'sine çevirir."""
+
+    if APP_LOGO is None:
+        return ""
+
+    buffer = io.BytesIO()
+    APP_LOGO.save(buffer, format="PNG")
+    encoded_logo = base64.b64encode(buffer.getvalue()).decode("ascii")
+
+    return f"data:image/png;base64,{encoded_logo}"
+
+
+APP_LOGO_DATA_URI = get_logo_data_uri()
 
 
 # ============================================================
@@ -174,6 +191,19 @@ section[data-testid="stSidebar"] {
     display: block;
 }
 
+.landing-logo-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem;
+    border-radius: 14px;
+    transition: transform 180ms ease, filter 180ms ease;
+}
+
+.landing-logo-link:hover {
+    transform: translateY(-2px) scale(1.04);
+    filter: drop-shadow(0 0 12px rgba(114, 190, 255, 0.65));
+}
+
 @keyframes relive-gradient-shift {
     0% {
         background-position: 0% 50%;
@@ -213,6 +243,8 @@ section[data-testid="stSidebar"] {
 }
 
 .landing-hero {
+    position: relative;
+    overflow: hidden;
     min-height: 68vh;
     display: flex;
     flex-direction: column;
@@ -221,6 +253,34 @@ section[data-testid="stSidebar"] {
     text-align: center;
     padding: 4rem 1.5rem 5rem;
     animation: relive-fade-up 0.8s ease-out both;
+}
+
+.landing-hero-logo {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: min(62vw, 440px);
+    height: min(62vw, 440px);
+    object-fit: contain;
+    opacity: 0.12;
+    filter: saturate(0.8) brightness(1.35) drop-shadow(0 0 30px rgba(91, 178, 255, 0.62));
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+.landing-hero-logo-fallback {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    color: rgba(125, 199, 255, 0.15);
+    font-size: min(28vw, 15rem);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+.landing-hero-content {
+    position: relative;
+    z-index: 1;
 }
 
 .landing-kicker {
@@ -2029,6 +2089,14 @@ if "cookie_restore_checked" not in st.session_state:
     st.session_state.cookie_restore_checked = False
 
 
+if st.query_params.get("home") == "1":
+    if st.session_state.user:
+        st.session_state.sayfa = "Ana Ekran"
+
+    st.query_params.clear()
+    st.rerun()
+
+
 # ============================================================
 # 5A. HER ÇALIŞTIRMADA SUPABASE OTURUMUNU YENİDEN YÜKLE
 # ============================================================
@@ -2207,17 +2275,15 @@ if not st.session_state.user:
 
     with col_logo:
 
-        logo_col, title_col = st.columns([1, 5])
-
-        with logo_col:
-
-            if APP_LOGO:
-
-                st.image(APP_LOGO, width=48)
-
-        with title_col:
-
-            st.markdown("### **Relive** — Keşfet!")
+        if APP_LOGO_DATA_URI:
+            st.markdown(
+                f"""
+                <a class="landing-logo-link" href="?home=1" aria-label="Ana sayfa">
+                    <img src="{APP_LOGO_DATA_URI}" width="58" height="58" alt="Relive">
+                </a>
+                """,
+                unsafe_allow_html=True
+            )
 
     with col_login:
 
@@ -2569,16 +2635,19 @@ if not st.session_state.user:
     # ========================================================
 
     st.html(
-        """
+        f"""
         <div class='landing-screen landing-content'>
             <section class='landing-hero'>
-                <div class='landing-kicker'>Relive • Kendine dön</div>
-                <h1>Ekrandan çıkışını değil,<br>gerçek hayata girişini keşfet.</h1>
-                <p>
-                    Ruh halini fark et, sevdiğin şeylere yaklaş ve bugün kendin için
-                    küçük ama gerçek bir adım at.
-                </p>
-                <div class='landing-scroll-hint'>Aşağı kaydır • Kendin için neyin mümkün olduğunu gör ↓</div>
+                {f"<img class='landing-hero-logo' src='{APP_LOGO_DATA_URI}' alt='' />" if APP_LOGO_DATA_URI else "<div class='landing-hero-logo-fallback'>🌱</div>"}
+                <div class='landing-hero-content'>
+                    <div class='landing-kicker'>Relive • Kendine dön</div>
+                    <h1>Ekrandan çıkışını değil,<br>gerçek hayata girişini keşfet.</h1>
+                    <p>
+                        Ruh halini fark et, sevdiğin şeylere yaklaş ve bugün kendin için
+                        küçük ama gerçek bir adım at.
+                    </p>
+                    <div class='landing-scroll-hint'>Aşağı kaydır • Kendin için neyin mümkün olduğunu gör ↓</div>
+                </div>
             </section>
 
             <section class='landing-section scroll-reveal'>
