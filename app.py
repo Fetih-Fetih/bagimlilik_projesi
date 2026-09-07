@@ -167,9 +167,7 @@ footer {
     visibility: hidden;
 }
 
-header {
-    visibility: hidden;
-}
+ 
 
 /* Kendi menümüzü kullandığımız için
    Streamlit'in varsayılan sidebar'ını gizliyoruz. */
@@ -2336,7 +2334,7 @@ if not st.session_state.user:
             if APP_LOGO_DATA_URI
             else "<span class='landing-logo-fallback'>R</span>"
         )
-        st.markdown(
+        st.html(
             f"""
             <a
                 class="landing-logo-link"
@@ -2346,8 +2344,7 @@ if not st.session_state.user:
             >
                 {logo_markup}
             </a>
-            """,
-            unsafe_allow_html=True
+            """
         )
 
     with col_login:
