@@ -2568,7 +2568,7 @@ if not st.session_state.user:
     # ANA EKRAN
     # ========================================================
 
-    st.markdown(
+    st.html(
         """
         <div class='landing-screen landing-content'>
             <section class='landing-hero'>
@@ -2619,8 +2619,7 @@ if not st.session_state.user:
                 <p>Ücretsiz katıl, ruh halini ve hobilerini belirle. İlk önerin birkaç saniye içinde hazır.</p>
             </section>
         </div>
-        """,
-        unsafe_allow_html=True
+        """
     )
 
     components.html(
