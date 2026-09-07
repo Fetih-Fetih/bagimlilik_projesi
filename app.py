@@ -549,15 +549,28 @@ def generate_gemini_content(prompt: str) -> str | None:
 
     endpoint = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"gemini-2.5-flash:generateContent?key={api_key}"
+        "gemini-2.0-flash:generateContent"
     )
 
-    response = requests.post(
-        endpoint,
-        json={"contents": [{"parts": [{"text": prompt}]}]},
-        timeout=60
-    )
-    response.raise_for_status()
+    try:
+        response = requests.post(
+            endpoint,
+            params={"key": api_key},
+            json={"contents": [{"parts": [{"text": prompt}]}]},
+            timeout=60
+        )
+        response.raise_for_status()
+
+    except requests.HTTPError as error:
+        st.error(
+            f"Gemini API hatası ({error.response.status_code}). "
+            "API anahtarını ve Gemini API erişimini kontrol edin."
+        )
+        return None
+
+    except requests.RequestException:
+        st.error("Gemini API'ye bağlanılamadı. Lütfen daha sonra tekrar deneyin.")
+        return None
 
     response_data = response.json()
     return response_data["candidates"][0]["content"]["parts"][0]["text"]
