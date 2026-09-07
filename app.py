@@ -19,7 +19,8 @@ from datetime import datetime, date, timedelta
 # 0B. LOGO
 # ============================================================
 
-LOGO_PATH = "assets/logo.png"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOGO_PATH = os.path.join(BASE_DIR, "assets", "logo.png")
 
 
 def get_logo():
@@ -43,8 +44,17 @@ def get_logo_data_uri() -> str:
     if APP_LOGO is None:
         return ""
 
+    logo = APP_LOGO.convert("RGBA")
+    pixels = logo.load()
+
+    for y in range(logo.height):
+        for x in range(logo.width):
+            red, green, blue, alpha = pixels[x, y]
+            if red > 242 and green > 242 and blue > 242:
+                pixels[x, y] = (red, green, blue, 0)
+
     buffer = io.BytesIO()
-    APP_LOGO.save(buffer, format="PNG")
+    logo.save(buffer, format="PNG")
     encoded_logo = base64.b64encode(buffer.getvalue()).decode("ascii")
 
     return f"data:image/png;base64,{encoded_logo}"
@@ -204,6 +214,21 @@ section[data-testid="stSidebar"] {
     filter: drop-shadow(0 0 12px rgba(114, 190, 255, 0.65));
 }
 
+.landing-logo-fallback {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 58px;
+    height: 58px;
+    border: 2px solid #83c8ff;
+    border-radius: 18px;
+    background: linear-gradient(145deg, #1c72c2, #081326);
+    color: #ffffff;
+    font-size: 1.9rem;
+    font-weight: 800;
+    box-shadow: 0 0 22px rgba(92, 181, 255, 0.42);
+}
+
 @keyframes relive-gradient-shift {
     0% {
         background-position: 0% 50%;
@@ -262,8 +287,9 @@ section[data-testid="stSidebar"] {
     width: min(62vw, 440px);
     height: min(62vw, 440px);
     object-fit: contain;
-    opacity: 0.12;
-    filter: saturate(0.8) brightness(1.35) drop-shadow(0 0 30px rgba(91, 178, 255, 0.62));
+    opacity: 0.2;
+    filter: saturate(1.05) brightness(1.18) drop-shadow(0 0 30px rgba(91, 178, 255, 0.62));
+    mix-blend-mode: screen;
     transform: translate(-50%, -50%);
     pointer-events: none;
 }
@@ -2275,15 +2301,19 @@ if not st.session_state.user:
 
     with col_logo:
 
-        if APP_LOGO_DATA_URI:
-            st.markdown(
-                f"""
-                <a class="landing-logo-link" href="?home=1" aria-label="Ana sayfa">
-                    <img src="{APP_LOGO_DATA_URI}" width="58" height="58" alt="Relive">
-                </a>
-                """,
-                unsafe_allow_html=True
-            )
+        logo_markup = (
+            f"<img src='{APP_LOGO_DATA_URI}' width='58' height='58' alt='Relive'>"
+            if APP_LOGO_DATA_URI
+            else "<span class='landing-logo-fallback'>R</span>"
+        )
+        st.markdown(
+            f"""
+            <a class="landing-logo-link" href="?home=1" aria-label="Ana sayfa">
+                {logo_markup}
+            </a>
+            """,
+            unsafe_allow_html=True
+        )
 
     with col_login:
 
