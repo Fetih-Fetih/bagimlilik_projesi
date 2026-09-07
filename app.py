@@ -2653,21 +2653,6 @@ if not st.session_state.user:
         width=0
     )
 
-    landing_cta_col, landing_login_col, _ = st.columns([2, 1.5, 3])
-
-    with landing_cta_col:
-        if st.button("📝 Hemen Üye Ol", key="landing_register", type="primary", use_container_width=True):
-            st.session_state.show_auth_modal = True
-            st.session_state.auth_mode = "register"
-            st.rerun()
-
-    with landing_login_col:
-        if st.button("🔑 Giriş Yap", key="landing_login", use_container_width=True):
-            st.session_state.show_auth_modal = True
-            st.session_state.auth_mode = "login"
-            st.rerun()
-
-
 # ============================================================
 # 7. GİRİŞ YAPILMIŞSA
 # ============================================================
