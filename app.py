@@ -567,29 +567,52 @@ def generate_gemini_content(prompt: str) -> str | None:
             "gemini-2.0-flash-lite",
             "gemini-1.5-flash"
         ]
-        selected_model = next(
-            (model for model in preferred_models if model in available_models),
-            next((model for model in available_models if "flash" in model), None)
+
+        candidate_models = [
+            model for model in preferred_models if model in available_models
+        ]
+        candidate_models.extend(
+            model for model in available_models
+            if "flash" in model and model not in candidate_models
         )
 
-        if not selected_model:
+        if not candidate_models:
             st.error("Bu Gemini API anahtarı için kullanılabilir bir metin modeli bulunamadı.")
             return None
 
-        response = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{selected_model}:generateContent",
-            params={"key": api_key},
-            json={"contents": [{"parts": [{"text": prompt}]}]},
-            timeout=60
-        )
-        response.raise_for_status()
+        last_error = None
+
+        for selected_model in candidate_models:
+            response = requests.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/"
+                f"{selected_model}:generateContent",
+                params={"key": api_key},
+                json={"contents": [{"parts": [{"text": prompt}]}]},
+                timeout=60
+            )
+
+            if response.ok:
+                response_data = response.json()
+                return response_data["candidates"][0]["content"]["parts"][0]["text"]
+
+            last_error = response
+
+        if last_error is not None:
+            last_error.raise_for_status()
 
     except requests.HTTPError as error:
         status_code = error.response.status_code if error.response is not None else "bilinmiyor"
+        error_message = ""
+
+        if error.response is not None:
+            try:
+                error_message = error.response.json().get("error", {}).get("message", "")
+            except ValueError:
+                pass
+
         st.error(
             f"Gemini API hatası ({status_code}). "
-            "API anahtarını ve Gemini API erişimini kontrol edin."
+            f"{error_message or 'API anahtarını ve Gemini API erişimini kontrol edin.'}"
         )
         return None
 
@@ -597,8 +620,7 @@ def generate_gemini_content(prompt: str) -> str | None:
         st.error("Gemini API'ye bağlanılamadı. Lütfen daha sonra tekrar deneyin.")
         return None
 
-    response_data = response.json()
-    return response_data["candidates"][0]["content"]["parts"][0]["text"]
+    return None
 
 
 def get_hobby_related_events(hobbies: list[str], city: str | None = None, limit: int = 4) -> list[dict]:
