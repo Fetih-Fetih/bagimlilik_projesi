@@ -1991,14 +1991,14 @@ if not st.session_state.user:
                     password = st.text_input("Şifre", type="password", key="l_pass")
 
                     remember_device = st.checkbox(
-                        "🔒 Bu cihazı hatırla",
+                        "🔒 Beni hatırla",
                         value=False,
                         key="l_remember",
                         help=(
-                            "Sadece kendi kişisel cihazında işaretle. "
-                            "İşaretlersen 30 gün boyunca tekrar giriş "
-                            "istenmez — ortak/paylaşılan bir cihazda "
-                            "bunu işaretleme."
+                            "Sadece kendi bilgisayarında işaretle. "
+                            "İşaretlersen bu tarayıcıda 30 gün boyunca "
+                            "sayfayı yenilediğinde hesabın açık kalır. "
+                            "Ortak bilgisayarda işaretleme."
                         )
                     )
 
@@ -2030,6 +2030,10 @@ if not st.session_state.user:
                                     st.session_state.pending_remember_token = (
                                         res.session.refresh_token
                                     )
+
+                                else:
+
+                                    delete_browser_cookie(AUTH_COOKIE_NAME)
 
                                 st.rerun()
 
