@@ -306,7 +306,8 @@ def set_browser_cookie(name: str, value: str, days: int = 30) -> None:
 def delete_browser_cookie(name: str) -> None:
     """Ana uygulama alanındaki tarayıcı çerezini siler."""
 
-    cookie_manager.delete(name)
+    if cookie_manager.get(name) is not None:
+        cookie_manager.delete(name)
 
 
 def inject_cookie_check_redirect(name: str, query_param: str) -> None:
@@ -1878,6 +1879,9 @@ if "last_redemption_code" not in st.session_state:
 if "last_redemption_title" not in st.session_state:
     st.session_state.last_redemption_title = None
 
+if "cookie_restore_checked" not in st.session_state:
+    st.session_state.cookie_restore_checked = False
+
 
 # ============================================================
 # 5A. HER ÇALIŞTIRMADA SUPABASE OTURUMUNU YENİDEN YÜKLE
@@ -2015,7 +2019,12 @@ if st.session_state.user is None and not st.session_state.get("auth_restore_done
     token_from_url = st.query_params.get(AUTH_QUERY_PARAM)
 
     if not token_from_url:
+        cookie_manager.get_all()
         token_from_url = cookie_manager.get(AUTH_COOKIE_NAME)
+
+        if not st.session_state.cookie_restore_checked:
+            st.session_state.cookie_restore_checked = True
+            st.rerun()
 
     if token_from_url:
 
