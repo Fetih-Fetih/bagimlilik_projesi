@@ -1764,7 +1764,7 @@ if not st.session_state.user:
 
         with title_col:
 
-            st.markdown("### **Relive** — Karakter & Alışkanlık Koçu")
+            st.markdown("### **Relive** — Keşfet!")
 
     with col_login:
 
