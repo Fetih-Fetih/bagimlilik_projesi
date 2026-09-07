@@ -1,7 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 from supabase import create_client, Client
-from openai import OpenAI
+from google import genai
 from PIL import Image
 import uuid
 import re
@@ -535,15 +535,19 @@ def apply_auth_session(user, session) -> None:
     st.session_state.business = get_business_info(user.id)
 
 
-def get_ai_client() -> OpenAI | None:
-    """OpenAI istemcisini güvenli şekilde oluşturur, anahtar yoksa None döner."""
 
-    api_key = get_secret("OPENAI_API_KEY").strip()
+
+
+
+def get_ai_client():
+    """Gemini istemcisini güvenli şekilde oluşturur, anahtar yoksa None döner."""
+
+    api_key = get_secret("GEMINI_API_KEY").strip()
 
     if not api_key:
         return None
 
-    return OpenAI(api_key=api_key)
+    return genai.Client(api_key=api_key)
 
 
 def get_hobby_related_events(hobbies: list[str], city: str | None = None, limit: int = 4) -> list[dict]:
@@ -654,15 +658,15 @@ def generate_mood_recommendation(display_name: str, mood: str) -> str | None:
     )
 
     try:
-        response = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": f"Şu an {mood} hissediyorum. Bana öneri ver."}
-            ],
-            model="gpt-4o-mini"
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=(
+                f"{prompt}\n\n"
+                f"Kullanıcı mesajı: Şu an {mood} hissediyorum. Bana öneri ver."
+            )
         )
 
-        return response.choices[0].message.content
+        return response.text
 
     except Exception as error:
         st.error(f"AI önerisi alınamadı: {error}")
@@ -2665,18 +2669,18 @@ else:
         render_hobby_recommendations(st.session_state.get("mood"))
 
         # ====================================================
-        # GROQ
+        # GEMINI
         # ====================================================
 
-        GROQ_API_KEY = get_secret("OPENAI_API_KEY").strip()
+        GEMINI_API_KEY = get_secret("GEMINI_API_KEY").strip()
 
-        if not GROQ_API_KEY:
+        if not GEMINI_API_KEY:
 
-            st.error("OPENAI_API_KEY bulunamadı.")
+            st.error("GEMINI_API_KEY bulunamadı.")
 
         else:
 
-            client = OpenAI(api_key=GROQ_API_KEY)
+            client = get_ai_client()
 
             current_messages = []
 
@@ -2811,20 +2815,22 @@ else:
                                 "alışkanlık/motivasyon önerisi ver."
                             )
 
-                        api_messages = [{"role": "system", "content": system_prompt}]
-
-                        for msg in st.session_state.chats[chat_id]["messages"]:
-
-                            api_messages.append(
-                                {"role": msg["role"], "content": msg["content"]}
-                            )
-
-                        chat_completion = client.chat.completions.create(
-                            messages=api_messages,
-                            model="gpt-4o-mini"
+                        conversation_text = "\n\n".join(
+                            f"{'Kullanıcı' if msg['role'] == 'user' else 'AI koç'}: {msg['content']}"
+                            for msg in st.session_state.chats[chat_id]["messages"]
                         )
 
-                        ai_reply = chat_completion.choices[0].message.content
+                        chat_completion = client.models.generate_content(
+                            model="gemini-2.5-flash",
+                            contents=(
+                                f"{system_prompt}\n\n"
+                                "Aşağıdaki sohbet geçmişine göre son kullanıcı mesajına cevap ver. "
+                                "Cevabın sıcak, kısa ve uygulanabilir olsun.\n\n"
+                                f"{conversation_text}"
+                            )
+                        )
+
+                        ai_reply = chat_completion.text
 
                         st.markdown(ai_reply)
 
