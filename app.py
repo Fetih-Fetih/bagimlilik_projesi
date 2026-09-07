@@ -197,6 +197,146 @@ section[data-testid="stSidebar"] {
     }
 }
 
+@keyframes relive-glow {
+    0%, 100% {
+        box-shadow: 0 0 0 rgba(82, 169, 255, 0);
+    }
+    50% {
+        box-shadow: 0 0 42px rgba(82, 169, 255, 0.22);
+    }
+}
+
+.landing-content {
+    max-width: 980px;
+    margin: 0 auto;
+    color: #f4f8ff;
+}
+
+.landing-hero {
+    min-height: 68vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 4rem 1.5rem 5rem;
+    animation: relive-fade-up 0.8s ease-out both;
+}
+
+.landing-kicker {
+    color: #8dcbff;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+}
+
+.landing-hero h1 {
+    max-width: 760px;
+    margin: 1rem 0;
+    font-size: clamp(2.4rem, 6vw, 5.2rem);
+    line-height: 1.04;
+    color: #ffffff;
+}
+
+.landing-hero p {
+    max-width: 600px;
+    color: #c4d8f2;
+    font-size: 1.15rem;
+    line-height: 1.7;
+}
+
+.landing-scroll-hint {
+    margin-top: 3rem;
+    color: #80bdf2;
+    font-size: 0.9rem;
+    animation: relive-glow 3s ease-in-out infinite;
+}
+
+.landing-section {
+    min-height: 48vh;
+    display: flex;
+    align-items: center;
+    padding: 5rem 2rem;
+    border-top: 1px solid rgba(155, 207, 255, 0.14);
+}
+
+.scroll-reveal {
+    opacity: 0;
+    transform: translateY(42px);
+    transition: opacity 800ms ease, transform 800ms ease;
+}
+
+.scroll-reveal.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.landing-section:nth-child(even) {
+    background: rgba(13, 42, 76, 0.25);
+}
+
+.landing-section-inner {
+    max-width: 700px;
+    animation: relive-fade-up 0.9s ease-out both;
+}
+
+.landing-section h2 {
+    margin: 0.7rem 0 1rem;
+    color: #ffffff;
+    font-size: clamp(1.8rem, 4vw, 3.3rem);
+    line-height: 1.1;
+}
+
+.landing-section p {
+    color: #c4d8f2;
+    font-size: 1.08rem;
+    line-height: 1.75;
+}
+
+.landing-number {
+    color: #61b4ff;
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+}
+
+.landing-final {
+    min-height: 48vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 5rem 1.5rem 7rem;
+    border-top: 1px solid rgba(155, 207, 255, 0.18);
+}
+
+.landing-final h2 {
+    max-width: 680px;
+    color: #ffffff;
+    font-size: clamp(2rem, 4vw, 3.8rem);
+    line-height: 1.1;
+}
+
+.landing-final p {
+    max-width: 560px;
+    color: #c4d8f2;
+    line-height: 1.7;
+}
+
+@media (max-width: 640px) {
+    .landing-hero {
+        min-height: 72vh;
+        padding: 3rem 1rem 4rem;
+    }
+
+    .landing-section {
+        min-height: 42vh;
+        padding: 4rem 1.25rem;
+    }
+}
+
 body:has(.home-screen, .landing-screen) .stApp {
     background: linear-gradient(125deg, #05070d, #0b1b35, #123d70, #07101f);
     background-size: 320% 320%;
@@ -2428,27 +2568,104 @@ if not st.session_state.user:
     # ANA EKRAN
     # ========================================================
 
-    st.markdown("<div class='landing-screen'></div>", unsafe_allow_html=True)
-    st.markdown("<br>", unsafe_allow_html=True)
-
     st.markdown(
         """
-        <h1 style='text-align: center; font-size: 2.4rem;'>
-        Ekrandan çıkışını değil,<br>
-        gerçek hayata girişini keşfet 🚀
-        </h1>
+        <div class='landing-screen landing-content'>
+            <section class='landing-hero'>
+                <div class='landing-kicker'>Relive • Kendine dön</div>
+                <h1>Ekrandan çıkışını değil,<br>gerçek hayata girişini keşfet.</h1>
+                <p>
+                    Ruh halini fark et, sevdiğin şeylere yaklaş ve bugün kendin için
+                    küçük ama gerçek bir adım at.
+                </p>
+                <div class='landing-scroll-hint'>Aşağı kaydır • Kendin için neyin mümkün olduğunu gör ↓</div>
+            </section>
+
+            <section class='landing-section scroll-reveal'>
+                <div class='landing-section-inner'>
+                    <div class='landing-number'>01 / FARK ET</div>
+                    <h2>Bugün nasıl hissettiğini seç.</h2>
+                    <p>
+                        Enerjini, stresini ya da yorgunluğunu görmezden gelmek yerine
+                        onu tanı. Relive, o anına uygun bir başlangıç önerir.
+                    </p>
+                </div>
+            </section>
+
+            <section class='landing-section scroll-reveal'>
+                <div class='landing-section-inner'>
+                    <div class='landing-number'>02 / KEŞFET</div>
+                    <h2>Hobilerin seni bekleyen kapılar olsun.</h2>
+                    <p>
+                        Spor, müzik, sanat, doğa veya yeni bir merak... İlgi alanlarını
+                        seç, yaşadığın şehirde sana iyi gelebilecek gerçek etkinlikleri keşfet.
+                    </p>
+                </div>
+            </section>
+
+            <section class='landing-section scroll-reveal'>
+                <div class='landing-section-inner'>
+                    <div class='landing-number'>03 / HAREKETE GEÇ</div>
+                    <h2>Küçük adımlar, daha dolu günler.</h2>
+                    <p>
+                        Katıldığın etkinliklerle puan kazan, ilerlemeni takip et ve
+                        ekran başında ertelediğin hayatı adım adım geri al.
+                    </p>
+                </div>
+            </section>
+
+            <section class='landing-final scroll-reveal'>
+                <h2>Kendin için bugün bir şey seç.</h2>
+                <p>Ücretsiz katıl, ruh halini ve hobilerini belirle. İlk önerin birkaç saniye içinde hazır.</p>
+            </section>
+        </div>
         """,
         unsafe_allow_html=True
     )
 
-    st.markdown(
+    components.html(
         """
-        <p style='text-align: center; font-size: 1.2rem; color: #555;'>
-        Alışkanlıklarını dönüştür, karakterini güçlendir.
-        </p>
+        <script>
+        (function() {
+            const page = window.parent.document;
+            const sections = page.querySelectorAll('.landing-screen .scroll-reveal');
+
+            if (!sections.length) {
+                return;
+            }
+
+            const observer = new IntersectionObserver(function(entries) {
+                entries.forEach(function(entry) {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('is-visible');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.18 });
+
+            sections.forEach(function(section) {
+                observer.observe(section);
+            });
+        })();
+        </script>
         """,
-        unsafe_allow_html=True
+        height=0,
+        width=0
     )
+
+    landing_cta_col, landing_login_col, _ = st.columns([2, 1.5, 3])
+
+    with landing_cta_col:
+        if st.button("📝 Hemen Üye Ol", key="landing_register", type="primary", use_container_width=True):
+            st.session_state.show_auth_modal = True
+            st.session_state.auth_mode = "register"
+            st.rerun()
+
+    with landing_login_col:
+        if st.button("🔑 Giriş Yap", key="landing_login", use_container_width=True):
+            st.session_state.show_auth_modal = True
+            st.session_state.auth_mode = "login"
+            st.rerun()
 
 
 # ============================================================
