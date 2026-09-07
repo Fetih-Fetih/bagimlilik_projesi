@@ -162,6 +162,12 @@ section[data-testid="stSidebar"] {
     border-radius: 8px;
 }
 
+.compact-home-button button {
+    min-height: 2.5rem !important;
+    padding: 0.25rem 0.6rem !important;
+    font-size: 0.9rem !important;
+}
+
 .avatar-circle {
     border-radius: 50%;
     object-fit: cover;
@@ -2557,10 +2563,14 @@ else:
             # SAYFALAR
             # -----------------------------------------------
 
-            if st.button("🌱 AI Koç & Sohbet", use_container_width=True):
+            st.markdown('<div class="compact-home-button">', unsafe_allow_html=True)
 
-                st.session_state.sayfa = "🌱 AI Koç & Sohbet"
+            if st.button("🏠 Ana Sayfa", use_container_width=True):
+
+                st.session_state.sayfa = "Ana Ekran"
                 st.rerun()
+
+            st.markdown('</div>', unsafe_allow_html=True)
 
             if st.button("📍 Etkinlikler", use_container_width=True):
 
